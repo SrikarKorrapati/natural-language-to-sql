@@ -1,6 +1,6 @@
 # Natural language to SQL
 
-A small Python terminal app built with **LangGraph**. Ask a question, review or edit the generated SQL, and approve it to print results. It retrieves relevant schema and successful past queries, remembers conversation context, and repairs SQL validation errors.
+A small Python terminal app built with **LangGraph**. Ask a question, review or edit the generated SQL, and approve it to print results. It combines keyword and semantic retrieval for schema and successful past queries, remembers conversation context, and repairs SQL validation errors.
 
 ## Run
 
@@ -21,6 +21,25 @@ python -m app.main --database /absolute/path/to/data.db --model gpt-4.1-mini
 ```
 
 The default model is `OPENAI_MODEL`, or `gpt-4.1-mini`. Optional `OPENAI_BASE_URL` selects an OpenAI-compatible Chat Completions provider with JSON mode. Use `--session sales-analysis` to start or resume a named conversation.
+
+## Hybrid retrieval
+
+Retrieval combines the existing keyword ranking with cosine similarity over embeddings. Reciprocal rank fusion merges their positions using `1 / (60 + rank)`; raw keyword and similarity scores are never compared directly.
+
+Configure embeddings in your environment or `.env`:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use keyword retrieval without embedding requests |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | Model served by the embedding provider |
+| `EMBEDDING_BASE_URL` | `OPENAI_BASE_URL`, otherwise `https://api.openai.com/v1` | OpenAI-compatible embedding endpoint |
+| `EMBEDDING_API_KEY` | `OPENAI_API_KEY` | Credential for that endpoint |
+
+A chat-compatible provider may not support embeddings. Set `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` to a separate provider when needed. The endpoint must support the [embeddings API](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create). An embedding failure prints a clear message and switches to keyword-only retrieval for the rest of the process. Restart after fixing the configuration to retry embeddings. Each proposal reports the retrieval mode actually used.
+
+Schema retrieval represents every table or view with its name, DDL, and foreign-key relationships, then expands the selected tables through foreign keys to support joins. Historical retrieval searches the question text of the latest **200 successful queries from the same database**, selecting up to **three examples** before including their SQL in the model prompt.
+
+Embeddings are cached in process memory by provider configuration and text. Unchanged schema and history questions reuse their vectors; new or changed text is embedded as needed. The cache is shared across agent instances and cleared when the process exits. No vector database is needed.
 
 ## Terminal workflow
 
@@ -49,16 +68,22 @@ Memory includes the last six approved, successful turns in the conversation. His
 python -m benchmarks.run --models gpt-4.1-mini gpt-4.1
 ```
 
-The runner creates the 20 fixture databases, generates SQL with empty memory for each case, and compares executed results with the reference SQL. It saves accuracy, SQL validity, latency, attempts, generated SQL, and errors to `benchmarks/results.json`. This runs the complete agent, including its correction attempts.
+The runner creates the 20 fixture databases, generates SQL with empty memory for each case, and compares executed results with the reference SQL. It saves accuracy, SQL validity, latency, attempts, generated SQL, retrieval mode, and errors to `benchmarks/results.json`. This runs the complete agent, including its correction attempts.
 
 [Benchmark format and scoring](benchmarks/README.md). All 200 reference queries have been executed and checked locally; no model accuracy is claimed for this new dataset.
 
 ## Code and tests
 
-Core code lives in three files: `app/main.py` for the terminal, `app/agent.py` for LangGraph and retrieval, and `app/db.py` for SQLite and memory. Tests use controlled model responses.
+Core code lives in four files: `app/main.py` for the terminal, `app/agent.py` for LangGraph, `app/retrieval.py` for keyword and semantic retrieval, and `app/db.py` for SQLite and memory. Tests use controlled chat and embedding responses.
 
 ```bash
 python -m pytest -q -p no:cacheprovider
 ```
 
-The provider receives the question, selected schema, and relevant historical questions/SQL. Result rows stay local. `.env`, databases, and conversation history are excluded from Git.
+## Privacy
+
+The **embedding provider** receives the current question, the last two successful question texts for follow-up context, table/view names with DDL and foreign-key relationships, and up to 200 candidate historical question texts from the same database. Historical query SQL is not embedded. Cached text is sent again only when an embedding is needed.
+
+The **chat provider** receives the current question, selected schema, up to six successful conversation turns with their SQL, and up to three retrieved question/SQL examples. These providers may be different when separate embedding settings are used.
+
+Result rows stay local. `.env`, databases, and conversation history are excluded from Git. Embedding vectors remain in process memory.

@@ -10,6 +10,11 @@ from app.db import Database, History
 from benchmarks.run import load_database
 
 
+@pytest.fixture(autouse=True)
+def keyword_retrieval(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_MODE", "keyword")
+
+
 @pytest.fixture
 def source(tmp_path):
     return load_database("s01_retail", tmp_path)
@@ -265,7 +270,9 @@ def test_terminal_shows_sql_then_executes_only_after_yes(agent, monkeypatch, cap
         return execute(sql)
 
     def approve(prompt=""):
-        assert "SELECT name FROM customers" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "SELECT name FROM customers" in output
+        assert "Retrieval: keyword" in output
         assert executions == []
         assert agent.history.successful() == []
         return "yes"

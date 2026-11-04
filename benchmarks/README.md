@@ -33,11 +33,11 @@ From the project root, with `OPENAI_API_KEY` configured:
 python -m benchmarks.run --models gpt-4.1-mini gpt-4.1 --output benchmarks/results.json
 ```
 
-Each model gets the same fixtures and a fresh conversation for every question. Reference SQL is executed locally. Generated SQL is read-only and runs automatically within the benchmark. The terminal app's human review step is excluded from evaluation.
+Each model gets the same fixtures and a fresh conversation for every question. Retrieval uses the [embedding configuration](../README.md#hybrid-retrieval) from the main README; `RETRIEVAL_MODE=keyword` runs a keyword-only baseline. Each case records its actual `retrieval_mode`, including keyword fallback after an embedding failure. Reference SQL is executed locally. Generated SQL is read-only and runs automatically within the benchmark. The terminal app's human review step is excluded from evaluation.
 
 Execution accuracy compares the result values, preserving duplicate rows and output-column order. Column aliases may differ. Row order matters when `order_sensitive` is true; otherwise rows are compared as a multiset. Numeric values use absolute tolerance `1e-6`. NULLs must match. Truncated results and errors fail the case.
 
-The score measures the whole LangGraph pipeline, including schema retrieval and up to five correction attempts. Set `SQL_MAX_REPAIRS=0` for a single-proposal comparison. Latency includes generation, corrections, validation, and execution. Use the same retry budget and provider settings when comparing models.
+The score measures the whole LangGraph pipeline, including schema retrieval and up to five correction attempts. Set `SQL_MAX_REPAIRS=0` for a single-proposal comparison. Latency includes retrieval, uncached embedding requests, generation, corrections, validation, and execution. Use the same retry budget, retrieval mode, embedding model, and provider settings when comparing models. The in-process embedding cache is shared across cases and models, so later requests can benefit from cached vectors; use separate processes when comparing latency from an empty cache.
 
 All 200 references were executed through the application's read-only boundary and reviewed against their questions. The fixtures include cases designed to expose common mistakes, such as join multiplication, omitted status filters, mishandled ties, and averaging at the wrong level. Tests check the exact 20×10 layout, foreign keys, and saved reference results.
 

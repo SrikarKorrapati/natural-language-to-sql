@@ -88,12 +88,17 @@ def run(models, cases, agent_factory=SQLAgent):
                     "correct": False,
                     "attempts": 0,
                     "sql": None,
+                    "retrieval_mode": None,
                     "error": None,
                 }
                 started = perf_counter()
                 try:
                     proposal = agent.propose(case["question"], "benchmark", model)
-                    result.update(sql=proposal["sql"], attempts=proposal["attempts"])
+                    result.update(
+                        sql=proposal["sql"],
+                        attempts=proposal["attempts"],
+                        retrieval_mode=proposal.get("retrieval_mode"),
+                    )
                     database.validate(proposal["sql"])
                     result["valid_sql"] = True
                     actual = database.execute(proposal["sql"])

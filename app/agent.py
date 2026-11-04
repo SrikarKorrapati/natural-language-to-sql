@@ -1,44 +1,15 @@
 """A small LangGraph: retrieve → generate → validate → repair or human review."""
 
 import json
-import math
 import os
-import re
 import sqlite3
-from collections import Counter
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from openai import OpenAI
 
 from app.db import Database, History
-
-
-def tokens(text: str) -> Counter:
-    return Counter(
-        word.rstrip("s")
-        for word in re.findall(r"[a-z0-9]+", text.lower())
-        if len(word) > 1
-    )
-
-
-def retrieve(query: str, documents: list[dict], text, limit: int) -> list[dict]:
-    """Lexical retrieval with inverse-document-frequency weighting; no vector service."""
-    if not documents:
-        return []
-    terms = [tokens(text(doc)) for doc in documents]
-    query_terms = tokens(query)
-    frequency = Counter(word for doc in terms for word in doc)
-    scores = [
-        sum(
-            min(count, doc[word])
-            * (1 + math.log((len(documents) + 1) / (frequency[word] + 1)))
-            for word, count in query_terms.items()
-        )
-        for doc in terms
-    ]
-    ranked = sorted(range(len(documents)), key=lambda i: scores[i], reverse=True)
-    return [documents[i] for i in ranked[:limit] if scores[i] > 0]
+from app.retrieval import configured_retriever
 
 
 def model_completion(model: str, messages: list[dict]) -> dict:
@@ -57,6 +28,7 @@ class State(TypedDict, total=False):
     messages: list[dict]
     tables: list[str]
     examples: list[dict]
+    retrieval_mode: str
     sql: str
     explanation: str
     attempts: int
@@ -70,9 +42,11 @@ class SQLAgent:
         history: History,
         complete=None,
         max_repairs: int | None = None,
+        retriever=None,
     ):
         self.database, self.history = database, history
         self.complete = complete or model_completion
+        self.retriever = retriever if retriever is not None else configured_retriever()
         self.max_repairs = (
             int(os.getenv("SQL_MAX_REPAIRS", "5"))
             if max_repairs is None
@@ -98,16 +72,21 @@ class SQLAgent:
     def _retrieve(self, state: State) -> dict:
         schema = self.database.schema()
         memory = self.history.recent(state["session_id"])
-        # Prior SQL supplies table names for follow-ups such as "only the West region".
-        query = (
-            state["question"]
-            + " "
-            + " ".join(item["question"] + " " + item["sql"] for item in memory[-2:])
+        history = self.history.successful()
+        query = " ".join(
+            [state["question"], *(item["question"] for item in memory[-2:])]
         )
-        selected = (
-            retrieve(query, schema, lambda table: table["sql"] or table["name"], 4)
-            or schema
-        )
+        schema_texts = [json.dumps(table, sort_keys=True) for table in schema]
+        history_texts = [item["question"] for item in history]
+        hybrid = self.retriever.prepare([query, *schema_texts, *history_texts])
+        # Prior SQL supplies table names locally, without being sent for embedding.
+        schema_query = query + " " + " ".join(item["sql"] for item in memory[-2:])
+        selected = [
+            schema[i]
+            for i in self.retriever.rank(
+                schema_query, schema_texts, 4, semantic_query=query
+            )
+        ] or schema
         names = {table["name"] for table in selected}
         neighbors = set(names)
         for table in schema:
@@ -117,9 +96,7 @@ class SQLAgent:
                 neighbors.add(table["name"])
                 neighbors.update(key["table"] for key in table["foreign_keys"])
         selected = [table for table in schema if table["name"] in neighbors]
-        examples = retrieve(
-            query, self.history.successful(), lambda item: item["question"], 3
-        )
+        examples = [history[i] for i in self.retriever.rank(query, history_texts, 3)]
         examples = [
             {"question": item["question"], "sql": item["sql"]} for item in examples
         ]
@@ -141,6 +118,7 @@ class SQLAgent:
         return {
             "tables": [table["name"] for table in selected],
             "examples": examples,
+            "retrieval_mode": "hybrid" if hybrid else "keyword",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(context)},
@@ -197,6 +175,7 @@ class SQLAgent:
                 "explanation",
                 "tables",
                 "examples",
+                "retrieval_mode",
                 "attempts",
                 "validation_error",
             )
