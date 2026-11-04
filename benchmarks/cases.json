@@ -1,0 +1,2984 @@
+[
+  {
+    "id": "s01_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List product ID, name, and current catalog price for products priced at least 50, ordered by product ID.",
+    "expected_sql": "SELECT id,\n       name,\n       price\nFROM products\nWHERE price >= 50\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "select",
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q02",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count orders in each status. Return status and order count, sorted alphabetically by status.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS order_count\nFROM orders\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "aggregation",
+      "group_by",
+      "order_by"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q03",
+    "category": "distinct",
+    "difficulty": "easy",
+    "question": "Which customer regions are present? Return each distinct region once, alphabetically.",
+    "expected_sql": "SELECT DISTINCT region\nFROM customers\nORDER BY region;",
+    "order_sensitive": true,
+    "features": [
+      "distinct",
+      "order_by"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "Return every customer ID, name, and completed-order revenue rounded to two decimals, including zero for customers without completed sales. Use item quantities and historical unit prices. Sort by customer ID.",
+    "expected_sql": "SELECT c.id,\n       c.name,\n       ROUND(COALESCE(SUM(i.quantity * i.unit_price), 0), 2) AS revenue\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nAND o.status = 'completed'\nLEFT JOIN order_items i ON i.order_id = o.id\nGROUP BY c.id,\n         c.name\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "group_by",
+      "nulls",
+      "historical_values"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q05",
+    "category": "top_n",
+    "difficulty": "medium",
+    "question": "Which three products sold the most units in completed orders? Return product ID, name, and units. Exclude products without completed item lines; sort units descending, then product ID ascending.",
+    "expected_sql": "SELECT p.id,\n       p.name,\n       SUM(i.quantity) AS units\nFROM products p\nJOIN order_items i ON i.product_id = p.id\nJOIN orders o ON o.id = i.order_id\nWHERE o.status = 'completed'\nGROUP BY p.id,\n         p.name\nORDER BY units DESC,\n         p.id\nLIMIT 3;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "aggregation",
+      "group_by",
+      "top_n"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q06",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Which completed orders have an item total strictly above 100? Return order ID and total rounded to two decimals, sorted by order ID. Calculate totals from quantity times historical unit price.",
+    "expected_sql": "SELECT o.id,\n       ROUND(SUM(i.quantity * i.unit_price), 2) AS order_total\nFROM orders o\nJOIN order_items i ON i.order_id = o.id\nWHERE o.status = 'completed'\nGROUP BY o.id\nHAVING SUM(i.quantity * i.unit_price) > 100\nORDER BY o.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "aggregation",
+      "having",
+      "historical_values"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q07",
+    "category": "existence",
+    "difficulty": "medium",
+    "question": "Which customers have both a completed order and a cancelled order? Return customer ID and name once each, ordered by ID.",
+    "expected_sql": "SELECT c.id,\n       c.name\nFROM customers c\nWHERE EXISTS\n        (SELECT 1\n         FROM orders o\n         WHERE o.customer_id = c.id\n             AND o.status = 'completed')\n    AND EXISTS\n        (SELECT 1\n         FROM orders o\n         WHERE o.customer_id = c.id\n             AND o.status = 'cancelled')\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q08",
+    "category": "month_growth",
+    "difficulty": "hard",
+    "question": "For each month with completed orders, return YYYY-MM, revenue rounded to two decimals, and percentage change from the previous month present in the result, rounded to two decimals. Revenue uses historical item prices; empty orders contribute zero. Return NULL for the first change or a zero prior revenue. Sort by month.",
+    "expected_sql": "WITH monthly AS\n    (SELECT strftime('%Y-%m', o.ordered_at) AS MONTH,\n            COALESCE(SUM(i.quantity * i.unit_price), 0) AS revenue\n     FROM orders o\n     LEFT JOIN order_items i ON i.order_id = o.id\n     WHERE o.status = 'completed'\n     GROUP BY MONTH),\n     changes AS\n    (SELECT MONTH,\n            revenue,\n            LAG(revenue) OVER (\n                               ORDER BY MONTH) AS previous_revenue\n     FROM monthly)\nSELECT MONTH,\n       ROUND(revenue, 2) AS revenue,\n       ROUND(100.0 * (revenue - previous_revenue) / NULLIF(previous_revenue, 0), 2) AS growth_pct\nFROM changes\nORDER BY MONTH;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "window",
+      "lag",
+      "percentage",
+      "nulls",
+      "date_grouping"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q09",
+    "category": "group_winners",
+    "difficulty": "hard",
+    "question": "Find the product or products with the highest completed-order revenue within each category, including ties. Include all catalog products in the comparison with zero revenue when unsold. Return category, product ID, name, and revenue rounded to two decimals; sort category then product ID. Use historical item prices.",
+    "expected_sql": "WITH totals AS\n    (SELECT p.id,\n            p.name,\n            p.category,\n            COALESCE(SUM(CASE\n                             WHEN o.status = 'completed' THEN i.quantity * i.unit_price\n                             ELSE 0\n                         END), 0) AS revenue\n     FROM products p\n     LEFT JOIN order_items i ON i.product_id = p.id\n     LEFT JOIN orders o ON o.id = i.order_id\n     GROUP BY p.id,\n              p.name,\n              p.category),\n     ranked AS\n    (SELECT *,\n            DENSE_RANK() OVER (PARTITION BY category\n                               ORDER BY revenue DESC) AS POSITION\n     FROM totals)\nSELECT category,\n       id,\n       name,\n       ROUND(revenue, 2) AS revenue\nFROM ranked\nWHERE POSITION = 1\nORDER BY category,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "conditional_aggregation",
+      "window",
+      "dense_rank",
+      "ties"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s01_q10",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Which customers have bought every catalog product in the Home category through completed orders? Require the Home category to contain at least one product. Return customer ID and name, ordered by ID.",
+    "expected_sql": "SELECT c.id,\n       c.name\nFROM customers c\nWHERE EXISTS\n        (SELECT 1\n         FROM products\n         WHERE category = 'Home')\n    AND NOT EXISTS\n        (SELECT 1\n         FROM products p\n         WHERE p.category = 'Home'\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM orders o\n                  JOIN order_items i ON i.order_id = o.id\n                  WHERE o.customer_id = c.id\n                      AND o.status = 'completed'\n                      AND i.product_id = p.id))\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "exists",
+      "not_exists",
+      "correlated_subquery",
+      "inner_join"
+    ],
+    "schema_id": "s01_retail"
+  },
+  {
+    "id": "s02_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List employee ID and name for employees hired from 2021-01-01 through 2022-12-31 inclusive, ordered by employee ID.",
+    "expected_sql": "SELECT id,\n       name\nFROM employees\nWHERE hired_at BETWEEN '2021-01-01' AND '2022-12-31'\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "select",
+      "filter",
+      "between",
+      "date_filter"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q02",
+    "category": "department_average",
+    "difficulty": "easy",
+    "question": "Return each department ID, name, and average salary rounded to two decimals. Include departments without employees with NULL average salary; order by department ID.",
+    "expected_sql": "SELECT d.id,\n       d.name,\n       ROUND(AVG(e.salary), 2) AS average_salary\nFROM departments d\nLEFT JOIN employees e ON e.department_id = d.id\nGROUP BY d.id,\n         d.name\nORDER BY d.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "nulls"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q03",
+    "category": "distinct",
+    "difficulty": "easy",
+    "question": "Return every distinct employee job title, sorted alphabetically.",
+    "expected_sql": "SELECT DISTINCT title\nFROM employees\nORDER BY title;",
+    "order_sensitive": true,
+    "features": [
+      "distinct",
+      "order_by"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q04",
+    "category": "self_join",
+    "difficulty": "medium",
+    "question": "For every employee, return employee ID, employee name, and direct manager name. Return NULL manager name when there is no manager. Order by employee ID.",
+    "expected_sql": "SELECT e.id,\n       e.name,\n       m.name AS manager_name\nFROM employees e\nLEFT JOIN employees m ON m.id = e.manager_id\nORDER BY e.id;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "left_join",
+      "nulls"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q05",
+    "category": "correlated_average",
+    "difficulty": "medium",
+    "question": "Which employees earn strictly more than the average salary in their own department? Exclude unassigned employees. Return employee ID, name, department ID, and salary; sort by employee ID.",
+    "expected_sql": "SELECT e.id,\n       e.name,\n       e.department_id,\n       e.salary\nFROM employees e\nWHERE e.salary >\n        (SELECT AVG(peer.salary)\n         FROM employees peer\n         WHERE peer.department_id = e.department_id)\nORDER BY e.id;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "aggregation"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q06",
+    "category": "join_aggregation",
+    "difficulty": "medium",
+    "question": "Return every department ID, name, and total hours logged by its own employees in May 2025, including zero for departments without matching logs. Attribute hours to the employee department regardless of the project department. Sort by department ID.",
+    "expected_sql": "SELECT d.id,\n       d.name,\n       COALESCE(SUM(w.hours), 0) AS hours\nFROM departments d\nLEFT JOIN employees e ON e.department_id = d.id\nLEFT JOIN work_logs w ON w.employee_id = e.id\nAND w.worked_at >= '2025-05-01'\nAND w.worked_at < '2025-06-01'\nGROUP BY d.id,\n         d.name\nORDER BY d.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "date_filter",
+      "nulls"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q07",
+    "category": "anti_join",
+    "difficulty": "medium",
+    "question": "Which employees have no work logs during May 2025? Return employee ID and name, ordered by ID.",
+    "expected_sql": "SELECT e.id,\n       e.name\nFROM employees e\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM work_logs w\n         WHERE w.employee_id = e.id\n             AND w.worked_at >= '2025-05-01'\n             AND w.worked_at < '2025-06-01')\nORDER BY e.id;",
+    "order_sensitive": true,
+    "features": [
+      "not_exists",
+      "correlated_subquery",
+      "anti_join"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q08",
+    "category": "recursive_hierarchy",
+    "difficulty": "hard",
+    "question": "Trace the reporting chain above employee 7. Return manager employee ID, manager name, and distance, where the direct manager is distance 1. Exclude employee 7; sort by distance ascending.",
+    "expected_sql": "WITH RECURSIVE chain(id, name, manager_id, distance) AS\n    (SELECT m.id,\n            m.name,\n            m.manager_id,\n            1\n     FROM employees e\n     JOIN employees m ON m.id = e.manager_id\n     WHERE e.id = 7\n     UNION ALL SELECT m.id,\n                      m.name,\n                      m.manager_id,\n                      c.distance + 1\n     FROM CHAIN c\n     JOIN employees m ON m.id = c.manager_id)\nSELECT id,\n       name,\n       distance\nFROM CHAIN\nORDER BY distance;",
+    "order_sensitive": true,
+    "features": [
+      "recursive_cte",
+      "self_join",
+      "union_all"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q09",
+    "category": "salary_ranking",
+    "difficulty": "hard",
+    "question": "Within each non-NULL department, return employees in the top two distinct salary levels, including everyone tied at either level. Return department ID, employee ID, name, salary, and dense salary rank. Sort by department ID, rank, then employee ID.",
+    "expected_sql": "WITH ranked AS\n    (SELECT department_id,\n            id,\n            name,\n            salary,\n            DENSE_RANK() OVER (PARTITION BY department_id\n                               ORDER BY salary DESC) AS salary_rank\n     FROM employees\n     WHERE department_id IS NOT NULL)\nSELECT department_id,\n       id,\n       name,\n       salary,\n       salary_rank\nFROM ranked\nWHERE salary_rank <= 2\nORDER BY department_id,\n         salary_rank,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "window",
+      "dense_rank",
+      "ties",
+      "top_n"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s02_q10",
+    "category": "department_share",
+    "difficulty": "hard",
+    "question": "For each employee assigned to a department, return department ID, employee ID, name, all-time logged hours, and percentage of that department's logged hours rounded to two decimals. Include employees with zero hours; return 0 percent when a department has no hours. Sort by department ID then employee ID.",
+    "expected_sql": "WITH totals AS\n    (SELECT e.department_id,\n            e.id,\n            e.name,\n            COALESCE(SUM(w.hours), 0) AS hours\n     FROM employees e\n     LEFT JOIN work_logs w ON w.employee_id = e.id\n     WHERE e.department_id IS NOT NULL\n     GROUP BY e.id,\n              e.department_id,\n              e.name)\nSELECT department_id,\n       id,\n       name,\n       hours,\n       COALESCE(ROUND(100.0 * hours / NULLIF(SUM(hours) OVER (PARTITION BY department_id), 0), 2), 0) AS percentage\nFROM totals\nORDER BY department_id,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "window",
+      "left_join",
+      "percentage",
+      "nulls"
+    ],
+    "schema_id": "s02_hr"
+  },
+  {
+    "id": "s03_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "Return ID and name of students majoring in CS or Math whose names contain the letter a, ignoring ASCII case. Order by student ID.",
+    "expected_sql": "SELECT id,\n       name\nFROM students\nWHERE major IN ('CS',\n                'Math')\n    AND LOWER(name) LIKE '%a%'\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "in_filter",
+      "like",
+      "string_functions",
+      "order_by"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q02",
+    "category": "pagination",
+    "difficulty": "easy",
+    "question": "Sort all courses by credits descending, breaking ties by course ID ascending. Return the third and fourth rows of that ordering, with course ID, title, and credits in that order.",
+    "expected_sql": "SELECT id,\n       title,\n       credits\nFROM courses\nORDER BY credits DESC,\n         id\nLIMIT 2\nOFFSET 2;",
+    "order_sensitive": true,
+    "features": [
+      "order_by",
+      "limit",
+      "offset",
+      "ties"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q03",
+    "category": "status_counts",
+    "difficulty": "easy",
+    "question": "Count enrollment records in each status across all terms. Return status and count, ordered by status.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS enrollment_count\nFROM enrollments\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "aggregation"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q04",
+    "category": "weighted_average",
+    "difficulty": "medium",
+    "question": "For every student, return student ID, name, and credit-weighted average score rounded to two decimals across completed enrollments with a non-NULL score. Count repeat completions separately. Return NULL when no eligible grades exist. Sort by student ID.",
+    "expected_sql": "SELECT s.id,\n       s.name,\n       ROUND(SUM(e.score * c.credits) / SUM(c.credits), 2) AS weighted_score\nFROM students s\nLEFT JOIN enrollments e ON e.student_id = s.id\nAND e.status = 'completed'\nAND e.score IS NOT NULL\nLEFT JOIN courses c ON c.id = e.course_id\nGROUP BY s.id,\n         s.name\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "weighted_average",
+      "nulls"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q05",
+    "category": "course_popularity",
+    "difficulty": "medium",
+    "question": "For every course, return course ID, title, and number of non-withdrawn enrollment records in 2025-Spring, including zero. Sort by course ID.",
+    "expected_sql": "SELECT c.id,\n       c.title,\n       COUNT(e.student_id) AS enrollment_count\nFROM courses c\nLEFT JOIN enrollments e ON e.course_id = c.id\nAND e.term = '2025-Spring'\nAND e.status <> 'withdrawn'\nGROUP BY c.id,\n         c.title\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "nulls"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q06",
+    "category": "anti_join",
+    "difficulty": "medium",
+    "question": "Which students have never completed any enrollment? Return student ID and name, sorted by ID.",
+    "expected_sql": "SELECT s.id,\n       s.name\nFROM students s\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM enrollments e\n         WHERE e.student_id = s.id\n             AND e.status = 'completed')\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "not_exists",
+      "anti_join"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q07",
+    "category": "instructor_load",
+    "difficulty": "medium",
+    "question": "For every instructor, return instructor ID, name, number of assigned catalog courses, and total credits of those courses. Include instructors with no courses using zero counts and zero credits. Count each catalog course once regardless of enrollments; sort by instructor ID.",
+    "expected_sql": "SELECT i.id,\n       i.name,\n       COUNT(c.id) AS course_count,\n       COALESCE(SUM(c.credits), 0) AS credits\nFROM instructors i\nLEFT JOIN courses c ON c.instructor_id = i.id\nGROUP BY i.id,\n         i.name\nORDER BY i.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "group_by"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q08",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Which students have completed every required course in their own major in any term? Exclude majors with no required courses. Return student ID and name, sorted by ID.",
+    "expected_sql": "SELECT s.id,\n       s.name\nFROM students s\nWHERE EXISTS\n        (SELECT 1\n         FROM courses c\n         WHERE c.major = s.major\n             AND c.is_required = 1)\n    AND NOT EXISTS\n        (SELECT 1\n         FROM courses c\n         WHERE c.major = s.major\n             AND c.is_required = 1\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM enrollments e\n                  WHERE e.student_id = s.id\n                      AND e.course_id = c.id\n                      AND e.status = 'completed'))\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "exists",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q09",
+    "category": "term_winners",
+    "difficulty": "hard",
+    "question": "For each term, find the course or courses with the highest average score among completed enrollments with non-NULL scores, retaining ties before rounding. Return term, course ID, title, and average score rounded to two decimals; sort by term then course ID.",
+    "expected_sql": "WITH averages AS\n    (SELECT term,\n            course_id,\n            AVG(score) AS average_score\n     FROM enrollments\n     WHERE status = 'completed'\n         AND score IS NOT NULL\n     GROUP BY term,\n              course_id),\n     ranked AS\n    (SELECT *,\n            RANK() OVER (PARTITION BY term\n                         ORDER BY average_score DESC) AS POSITION\n     FROM averages)\nSELECT r.term,\n       c.id,\n       c.title,\n       ROUND(r.average_score, 2) AS average_score\nFROM ranked r\nJOIN courses c ON c.id = r.course_id\nWHERE r.position = 1\nORDER BY r.term,\n         c.id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "window",
+      "rank",
+      "ties",
+      "aggregation",
+      "inner_join"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s03_q10",
+    "category": "cohort_retention",
+    "difficulty": "hard",
+    "question": "Among distinct students with a non-withdrawn enrollment in 2024-Fall, how many also have a non-withdrawn enrollment in 2025-Spring? Return one row with cohort student count, retained student count, and retention percent rounded to two decimals. A student counts once per group; return NULL percent for an empty cohort.",
+    "expected_sql": "WITH cohort AS\n    (SELECT DISTINCT student_id\n     FROM enrollments\n     WHERE term = '2024-Fall'\n         AND status <> 'withdrawn'),\n     retained AS\n    (SELECT student_id\n     FROM cohort\n     WHERE EXISTS\n             (SELECT 1\n              FROM enrollments e\n              WHERE e.student_id = cohort.student_id\n                  AND e.term = '2025-Spring'\n                  AND e.status <> 'withdrawn'))\nSELECT\n    (SELECT COUNT(*)\n     FROM cohort) AS cohort_count,\n\n    (SELECT COUNT(*)\n     FROM retained) AS retained_count,\n       ROUND(100.0 *\n                 (SELECT COUNT(*)\n                  FROM retained) / NULLIF(\n                                              (SELECT COUNT(*)\n                                               FROM cohort), 0), 2) AS retention_pct;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "distinct",
+      "exists",
+      "scalar_subquery",
+      "percentage"
+    ],
+    "schema_id": "s03_education"
+  },
+  {
+    "id": "s04_q01",
+    "category": "catalog_order",
+    "difficulty": "easy",
+    "question": "List book ID, title, and publication year for all books, ordered by publication year descending then book ID ascending.",
+    "expected_sql": "SELECT id,\n       title,\n       published_year\nFROM books\nORDER BY published_year DESC,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "select",
+      "order_by"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q02",
+    "category": "as_of_filter",
+    "difficulty": "easy",
+    "question": "Which loans were active at the end of 2025-06-30? A loan is active if loaned on or before that date and not returned by that date. Return loan ID and book ID, ordered by loan ID.",
+    "expected_sql": "SELECT id,\n       book_id\nFROM loans\nWHERE loaned_at <= '2025-06-30'\n    AND (returned_at IS NULL\n         OR returned_at > '2025-06-30')\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "nulls",
+      "date_filter"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q03",
+    "category": "outer_count",
+    "difficulty": "easy",
+    "question": "Return author ID, author name, and number of catalog book titles for every author, including authors with zero titles. Order by author ID.",
+    "expected_sql": "SELECT a.id,\n       a.name,\n       COUNT(b.id) AS title_count\nFROM authors a\nLEFT JOIN books b ON b.author_id = a.id\nGROUP BY a.id,\n         a.name\nORDER BY a.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "group_by"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q04",
+    "category": "overdue_loans",
+    "difficulty": "medium",
+    "question": "For loans active at the end of 2025-06-30 whose due date is strictly earlier than that date, return loan ID, member name, book title, and integer days overdue as of 2025-06-30. A return after that date still counts as active. Sort by loan ID.",
+    "expected_sql": "SELECT l.id,\n       m.name,\n       b.title,\n       CAST(julianday('2025-06-30') - julianday(l.due_at) AS INTEGER) AS days_overdue\nFROM loans l\nJOIN members m ON m.id = l.member_id\nJOIN books b ON b.id = l.book_id\nWHERE l.loaned_at <= '2025-06-30'\n    AND (l.returned_at IS NULL\n         OR l.returned_at > '2025-06-30')\n    AND l.due_at < '2025-06-30'\nORDER BY l.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "date_arithmetic",
+      "nulls"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q05",
+    "category": "loan_duration",
+    "difficulty": "medium",
+    "question": "For every member, return member ID, name, returned-loan count, and average loan duration in days rounded to two decimals. Use all loans with a recorded return, including July returns. Return zero count and NULL average when none are returned; sort by member ID.",
+    "expected_sql": "SELECT m.id,\n       m.name,\n       COUNT(l.id) AS returned_count,\n       ROUND(AVG(julianday(l.returned_at) - julianday(l.loaned_at)), 2) AS average_days\nFROM members m\nLEFT JOIN loans l ON l.member_id = m.id\nAND l.returned_at IS NOT NULL\nGROUP BY m.id,\n         m.name\nORDER BY m.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "date_arithmetic",
+      "nulls"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q06",
+    "category": "maximum_ties",
+    "difficulty": "medium",
+    "question": "Find all book titles tied for the highest number of loan records across all dates. Exclude titles never borrowed. Return book ID, title, and loan count; order by book ID.",
+    "expected_sql": "WITH counts AS\n    (SELECT b.id,\n            b.title,\n            COUNT(*) AS loan_count\n     FROM books b\n     JOIN loans l ON l.book_id = b.id\n     GROUP BY b.id,\n              b.title)\nSELECT id,\n       title,\n       loan_count\nFROM counts\nWHERE loan_count =\n        (SELECT MAX(loan_count)\n         FROM counts)\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "scalar_subquery",
+      "aggregation",
+      "ties"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q07",
+    "category": "distinct_having",
+    "difficulty": "medium",
+    "question": "Which members have borrowed titles from at least two different authors across all dates? Return member ID and name, ordered by member ID.",
+    "expected_sql": "SELECT m.id,\n       m.name\nFROM members m\nWHERE m.id IN\n        (SELECT l.member_id\n         FROM loans l\n         JOIN books b ON b.id = l.book_id\n         GROUP BY l.member_id\n         HAVING COUNT(DISTINCT b.author_id) >= 2)\nORDER BY m.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "in_subquery",
+      "distinct",
+      "having",
+      "aggregation"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q08",
+    "category": "window_gaps",
+    "difficulty": "hard",
+    "question": "For each loan, return member ID, loan ID, loan date, and integer days since that member's previous loan date. Order a member's loans by loan date then loan ID, and use NULL for the first loan. Sort the result by member ID, loan date, then loan ID.",
+    "expected_sql": "SELECT member_id,\n       id,\n       loaned_at,\n       CAST(julianday(loaned_at) - julianday(LAG(loaned_at) OVER (PARTITION BY member_id\n                                                                  ORDER BY loaned_at, id)) AS INTEGER) AS gap_days\nFROM loans\nORDER BY member_id,\n         loaned_at,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "window",
+      "lag",
+      "date_arithmetic",
+      "nulls"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q09",
+    "category": "as_of_inventory",
+    "difficulty": "hard",
+    "question": "For each book, return book ID, title, and copies available at the end of 2025-06-30. Subtract loans started on or before that date and not returned by that date from total copies. Include titles with no active loans; order by book ID.",
+    "expected_sql": "SELECT b.id,\n       b.title,\n       b.total_copies - COUNT(l.id) AS available_copies\nFROM books b\nLEFT JOIN loans l ON l.book_id = b.id\nAND l.loaned_at <= '2025-06-30'\nAND (l.returned_at IS NULL\n     OR l.returned_at > '2025-06-30')\nGROUP BY b.id,\n         b.title,\n         b.total_copies\nORDER BY b.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_aggregation",
+      "date_filter",
+      "nulls"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s04_q10",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Which members have borrowed every catalog title by author 1 at least once across all dates? Require author 1 to have at least one title. Return member ID and name, ordered by ID.",
+    "expected_sql": "SELECT m.id,\n       m.name\nFROM members m\nWHERE EXISTS\n        (SELECT 1\n         FROM books\n         WHERE author_id = 1)\n    AND NOT EXISTS\n        (SELECT 1\n         FROM books b\n         WHERE b.author_id = 1\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM loans l\n                  WHERE l.member_id = m.id\n                      AND l.book_id = b.id))\nORDER BY m.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "exists",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s04_library"
+  },
+  {
+    "id": "s05_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "Return shipment ID and weight for in-transit shipments weighing at least 5 kilograms, ordered by shipment ID.",
+    "expected_sql": "SELECT id,\n       weight_kg\nFROM shipments\nWHERE status = 'in_transit'\n    AND weight_kg >= 5\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q02",
+    "category": "outer_count",
+    "difficulty": "easy",
+    "question": "Return every carrier ID, name, and total assigned shipment count across all statuses, including zero. Order by carrier ID.",
+    "expected_sql": "SELECT c.id,\n       c.name,\n       COUNT(s.id) AS shipment_count\nFROM carriers c\nLEFT JOIN shipments s ON s.carrier_id = c.id\nGROUP BY c.id,\n         c.name\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q03",
+    "category": "distinct",
+    "difficulty": "easy",
+    "question": "Return each distinct tracking-event type in uppercase with underscores replaced by spaces, sorted alphabetically by the formatted value.",
+    "expected_sql": "SELECT DISTINCT UPPER(REPLACE(event_type, '_', ' ')) AS event_label\nFROM tracking_events\nORDER BY event_label;",
+    "order_sensitive": true,
+    "features": [
+      "distinct",
+      "string_functions",
+      "order_by"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q04",
+    "category": "late_deliveries",
+    "difficulty": "medium",
+    "question": "Which delivered shipments arrived strictly after their promised timestamp? Return shipment ID, customer name, and hours late rounded to two decimals; sort by shipment ID.",
+    "expected_sql": "SELECT s.id,\n       c.name,\n       ROUND((julianday(s.delivered_at) - julianday(s.promised_at)) * 24, 2) AS hours_late\nFROM shipments s\nJOIN customers c ON c.id = s.customer_id\nWHERE s.status = 'delivered'\n    AND s.delivered_at > s.promised_at\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "date_arithmetic",
+      "filter"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q05",
+    "category": "weighted_rate",
+    "difficulty": "medium",
+    "question": "For every carrier, return carrier ID, name, and total cost divided by total weight of its non-cancelled shipments, rounded to two decimals. Return NULL when total weight is zero or no eligible shipments exist. Sort by carrier ID.",
+    "expected_sql": "SELECT c.id,\n       c.name,\n       ROUND(SUM(s.cost) / NULLIF(SUM(s.weight_kg), 0), 2) AS cost_per_kg\nFROM carriers c\nLEFT JOIN shipments s ON s.carrier_id = c.id\nAND s.status <> 'cancelled'\nGROUP BY c.id,\n         c.name\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "weighted_average",
+      "nulls"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q06",
+    "category": "distinct_having",
+    "difficulty": "medium",
+    "question": "Which customers have used at least two different non-NULL carriers on non-cancelled shipments? Return customer ID, name, and distinct carrier count; sort by customer ID.",
+    "expected_sql": "SELECT c.id,\n       c.name,\n       COUNT(DISTINCT s.carrier_id) AS carrier_count\nFROM customers c\nJOIN shipments s ON s.customer_id = c.id\nWHERE s.status <> 'cancelled'\nGROUP BY c.id,\n         c.name\nHAVING COUNT(DISTINCT s.carrier_id) >= 2\nORDER BY c.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "distinct",
+      "having"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q07",
+    "category": "missing_events",
+    "difficulty": "medium",
+    "question": "Which non-cancelled shipments have no tracking events? Return shipment ID and customer name, ordered by shipment ID.",
+    "expected_sql": "SELECT s.id,\n       c.name\nFROM shipments s\nJOIN customers c ON c.id = s.customer_id\nWHERE s.status <> 'cancelled'\n    AND NOT EXISTS\n        (SELECT 1\n         FROM tracking_events e\n         WHERE e.shipment_id = s.id)\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "not_exists",
+      "anti_join"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q08",
+    "category": "latest_per_group",
+    "difficulty": "hard",
+    "question": "For every shipment, return shipment ID, latest event type, and latest event timestamp. Choose the highest event ID when timestamps tie; return NULL event fields when no events exist. Sort by shipment ID.",
+    "expected_sql": "WITH ranked AS\n    (SELECT *,\n            ROW_NUMBER() OVER (PARTITION BY shipment_id\n                               ORDER BY occurred_at DESC, id DESC) AS POSITION\n     FROM tracking_events)\nSELECT s.id,\n       e.event_type,\n       e.occurred_at\nFROM shipments s\nLEFT JOIN ranked e ON e.shipment_id = s.id\nAND e.position = 1\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "window",
+      "row_number",
+      "left_join",
+      "ties"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q09",
+    "category": "event_elapsed",
+    "difficulty": "hard",
+    "question": "For shipments with both picked_up and delivered tracking events, return shipment ID and hours from the first picked_up event to the first delivered event rounded to two decimals. Use event timestamps, not shipment timestamps; sort by shipment ID.",
+    "expected_sql": "SELECT shipment_id,\n       ROUND((julianday(MIN(CASE\n                                WHEN event_type = 'delivered' THEN occurred_at\n                            END)) - julianday(MIN(CASE\n                                                      WHEN event_type = 'picked_up' THEN occurred_at\n                                                  END))) * 24, 2) AS hours_elapsed\nFROM tracking_events\nGROUP BY shipment_id\nHAVING COUNT(CASE\n                 WHEN event_type = 'picked_up' THEN 1\n             END) > 0\nAND COUNT(CASE\n              WHEN event_type = 'delivered' THEN 1\n          END) > 0\nORDER BY shipment_id;",
+    "order_sensitive": true,
+    "features": [
+      "conditional_aggregation",
+      "having",
+      "date_arithmetic"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s05_q10",
+    "category": "running_total",
+    "difficulty": "hard",
+    "question": "For each non-NULL carrier and each shipping date with non-cancelled shipments, return carrier ID, shipping date as YYYY-MM-DD, daily shipped weight, and cumulative shipped weight through that date for the carrier. Do not add missing dates. Sort by carrier ID then date.",
+    "expected_sql": "WITH daily AS\n    (SELECT carrier_id,\n            date(shipped_at) AS shipped_date,\n            SUM(weight_kg) AS daily_weight\n     FROM shipments\n     WHERE carrier_id IS NOT NULL\n         AND status <> 'cancelled'\n     GROUP BY carrier_id,\n              date(shipped_at))\nSELECT carrier_id,\n       shipped_date,\n       daily_weight,\n       SUM(daily_weight) OVER (PARTITION BY carrier_id\n                               ORDER BY shipped_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_weight\nFROM daily\nORDER BY carrier_id,\n         shipped_date;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "window",
+      "running_total",
+      "date_grouping"
+    ],
+    "schema_id": "s05_logistics"
+  },
+  {
+    "id": "s06_q01",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List patients with a known city. Return patient_id, name, and city, ordered by name and then patient_id.",
+    "expected_sql": "SELECT patient_id,\n       name,\n       city\nFROM patients\nWHERE city IS NOT NULL\nORDER BY name,\n         patient_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "nulls",
+      "order_by"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q02",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "Which completed appointments have a fee greater than 100? Return appointment_id and fee, ordered by fee descending and then appointment_id.",
+    "expected_sql": "SELECT appointment_id,\n       fee\nFROM appointments\nWHERE status = 'completed'\n    AND fee > 100\nORDER BY fee DESC,\n         appointment_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q03",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count appointments in each status. Return status and appointment_count, ordered alphabetically by status.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS appointment_count\nFROM appointments\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q04",
+    "category": "left_join",
+    "difficulty": "medium",
+    "question": "For every patient, including those with no appointments, show patient_id, name, and the number of appointments of any status. Use zero for no appointments and order by patient_id.",
+    "expected_sql": "SELECT p.patient_id,\n       p.name,\n       COUNT(a.appointment_id) AS appointment_count\nFROM patients p\nLEFT JOIN appointments a ON a.patient_id = p.patient_id\nGROUP BY p.patient_id,\n         p.name\nORDER BY p.patient_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "group_by",
+      "count",
+      "zero_inclusion"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q05",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Find clinicians with at least two completed appointments. Return clinician_id, name, completed_count, and average completed-appointment fee rounded to two decimals. Order by clinician_id.",
+    "expected_sql": "SELECT c.clinician_id,\n       c.name,\n       COUNT(*) AS completed_count,\n       ROUND(AVG(a.fee), 2) AS average_fee\nFROM clinicians c\nJOIN appointments a ON a.clinician_id = c.clinician_id\nWHERE a.status = 'completed'\nGROUP BY c.clinician_id,\n         c.name\nHAVING COUNT(*) >= 2\nORDER BY c.clinician_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "having",
+      "avg"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q06",
+    "category": "left_join",
+    "difficulty": "medium",
+    "question": "For every completed appointment, return appointment_id, patient name, fee, total payments, and balance_due. Balance is fee minus payments; keep negative balances for overpayments and use zero payments when none exist. Round payments and balance to two decimals and order by appointment_id.",
+    "expected_sql": "SELECT a.appointment_id,\n       p.name,\n       a.fee,\n       ROUND(COALESCE(SUM(pay.amount), 0), 2) AS total_payments,\n       ROUND(a.fee - COALESCE(SUM(pay.amount), 0), 2) AS balance_due\nFROM appointments a\nJOIN patients p ON p.patient_id = a.patient_id\nLEFT JOIN payments pay ON pay.appointment_id = a.appointment_id\nWHERE a.status = 'completed'\nGROUP BY a.appointment_id,\n         p.name,\n         a.fee\nORDER BY a.appointment_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "left_join",
+      "group_by",
+      "sum",
+      "coalesce",
+      "one_to_many"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q07",
+    "category": "right_join",
+    "difficulty": "medium",
+    "question": "Show every clinician, including clinicians without completed appointments, with clinician_id, name, and completed_count. Count only completed appointments and order by clinician_id.",
+    "expected_sql": "SELECT c.clinician_id,\n       c.name,\n       COUNT(a.appointment_id) AS completed_count\nFROM appointments a\nRIGHT JOIN clinicians c ON a.clinician_id = c.clinician_id\nAND a.status = 'completed'\nGROUP BY c.clinician_id,\n         c.name\nORDER BY c.clinician_id;",
+    "order_sensitive": true,
+    "features": [
+      "right_join",
+      "group_by",
+      "count",
+      "zero_inclusion",
+      "join_filter"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q08",
+    "category": "full_outer_join",
+    "difficulty": "hard",
+    "question": "Produce a reconciliation list containing every appointment and every payment, matching payments to appointments when possible. Keep one row per matched payment, appointments with no payment, and unallocated payments. Return appointment_id, payment_id, and amount; leave missing values NULL. Order by appointment_id with NULLs last, then payment_id.",
+    "expected_sql": "SELECT a.appointment_id,\n       p.payment_id,\n       p.amount\nFROM appointments a\nFULL OUTER JOIN payments p ON p.appointment_id = a.appointment_id\nORDER BY a.appointment_id IS NULL,\n                             a.appointment_id,\n                             p.payment_id;",
+    "order_sensitive": true,
+    "features": [
+      "full_outer_join",
+      "nulls",
+      "one_to_many",
+      "reconciliation"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q09",
+    "category": "window",
+    "difficulty": "hard",
+    "question": "Within each specialty, find the completed appointment or appointments with the highest fee, including ties. Return specialty, appointment_id, and fee, ordered by specialty and then appointment_id.",
+    "expected_sql": "WITH ranked AS\n    (SELECT c.specialty,\n            a.appointment_id,\n            a.fee,\n            DENSE_RANK() OVER (PARTITION BY c.specialty\n                               ORDER BY a.fee DESC) AS fee_rank\n     FROM appointments a\n     JOIN clinicians c ON c.clinician_id = a.clinician_id\n     WHERE a.status = 'completed')\nSELECT specialty,\n       appointment_id,\n       fee\nFROM ranked\nWHERE fee_rank = 1\nORDER BY specialty,\n         appointment_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "inner_join",
+      "window",
+      "dense_rank",
+      "ties"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s06_q10",
+    "category": "correlated_subquery",
+    "difficulty": "hard",
+    "question": "Which patients have at least one completed appointment and have fully paid every completed appointment? An appointment is fully paid when its summed payments are at least its fee; missing payments count as zero. Ignore appointments of other statuses. Return patient_id and name, ordered by patient_id.",
+    "expected_sql": "SELECT p.patient_id,\n       p.name\nFROM patients p\nWHERE EXISTS\n        (SELECT 1\n         FROM appointments a\n         WHERE a.patient_id = p.patient_id\n             AND a.status = 'completed')\n    AND NOT EXISTS\n        (SELECT 1\n         FROM appointments a\n         WHERE a.patient_id = p.patient_id\n             AND a.status = 'completed'\n             AND COALESCE(\n                              (SELECT SUM(pay.amount)\n                               FROM payments pay\n                               WHERE pay.appointment_id = a.appointment_id), 0) < a.fee)\nORDER BY p.patient_id;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "exists",
+      "not_exists",
+      "sum",
+      "coalesce",
+      "universal_condition"
+    ],
+    "schema_id": "s06_clinic"
+  },
+  {
+    "id": "s07_q01",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List open checking accounts. Return account_id and account_number, ordered by account_id.",
+    "expected_sql": "SELECT account_id,\n       account_number\nFROM accounts\nWHERE status = 'open'\n    AND kind = 'checking'\nORDER BY account_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q02",
+    "category": "date_filter",
+    "difficulty": "easy",
+    "question": "List withdrawal entries posted during March 2025. Return entry_id, account_id, posted_at, and the signed amount, ordered by posted_at and then entry_id.",
+    "expected_sql": "SELECT entry_id,\n       account_id,\n       posted_at,\n       amount\nFROM ledger_entries\nWHERE entry_type = 'withdrawal'\n    AND posted_at >= '2025-03-01'\n    AND posted_at < '2025-04-01'\nORDER BY posted_at,\n         entry_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "date_range",
+      "order_by"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q03",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Across all ledger entries, show each entry_type, its entry count, and the sum of signed amounts rounded to two decimals. Order by entry_type.",
+    "expected_sql": "SELECT entry_type,\n       COUNT(*) AS entry_count,\n       ROUND(SUM(amount), 2) AS signed_total\nFROM ledger_entries\nGROUP BY entry_type\nORDER BY entry_type;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count",
+      "sum"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q04",
+    "category": "cte",
+    "difficulty": "medium",
+    "question": "For every customer, return customer_id, name, and the combined current balance of all their accounts, including closed accounts. Current balance is opening_balance plus all ledger entries. Customers without accounts should show zero. Round the combined balance to two decimals and order by customer_id.",
+    "expected_sql": "WITH account_balances AS\n    (SELECT a.account_id,\n            a.customer_id,\n            a.opening_balance + COALESCE(SUM(l.amount), 0) AS balance\n     FROM accounts a\n     LEFT JOIN ledger_entries l ON l.account_id = a.account_id\n     GROUP BY a.account_id,\n              a.customer_id,\n              a.opening_balance)\nSELECT c.customer_id,\n       c.name,\n       ROUND(COALESCE(SUM(b.balance), 0), 2) AS combined_balance\nFROM customers c\nLEFT JOIN account_balances b ON b.customer_id = c.customer_id\nGROUP BY c.customer_id,\n         c.name\nORDER BY c.customer_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "group_by",
+      "sum",
+      "coalesce",
+      "fanout_safe"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q05",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Find accounts with at least two negative ledger entries, including fees as well as withdrawals. Return account_number, negative_entry_count, and the positive total of money removed, rounded to two decimals. Use all posting dates and order by account_number.",
+    "expected_sql": "SELECT a.account_number,\n       COUNT(*) AS negative_entry_count,\n       ROUND(-SUM(l.amount), 2) AS money_removed\nFROM accounts a\nJOIN ledger_entries l ON l.account_id = a.account_id\nWHERE l.amount < 0\nGROUP BY a.account_id,\n         a.account_number\nHAVING COUNT(*) >= 2\nORDER BY a.account_number;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "having",
+      "count",
+      "sum"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q06",
+    "category": "right_join",
+    "difficulty": "medium",
+    "question": "For every account, count ledger entries posted on or before March 31, 2025, and sum their signed amounts. Include accounts without qualifying entries with count zero and net change zero. Return account_number, entry_count, and net_change rounded to two decimals, ordered by account_number.",
+    "expected_sql": "SELECT a.account_number,\n       COUNT(l.entry_id) AS entry_count,\n       ROUND(COALESCE(SUM(l.amount), 0), 2) AS net_change\nFROM ledger_entries l\nRIGHT JOIN accounts a ON a.account_id = l.account_id\nAND l.posted_at < '2025-04-01'\nGROUP BY a.account_id,\n         a.account_number\nORDER BY a.account_number;",
+    "order_sensitive": true,
+    "features": [
+      "right_join",
+      "join_filter",
+      "group_by",
+      "count",
+      "sum",
+      "zero_inclusion"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q07",
+    "category": "cte",
+    "difficulty": "medium",
+    "question": "Compare each account with its March 31, 2025 statement when the statement ending balance is known. Show only mismatches after rounding both balances to two decimals. The book balance is opening_balance plus postings through March 31. Return account_number, book_balance, statement_balance, and the rounded book balance minus the rounded statement balance as difference. Round every monetary output to two decimals. Order by account_number ascending.",
+    "expected_sql": "WITH book AS\n    (SELECT a.account_number,\n            ROUND(a.opening_balance + COALESCE(SUM(l.amount), 0), 2) AS book_balance\n     FROM accounts a\n     LEFT JOIN ledger_entries l ON l.account_id = a.account_id\n     AND l.posted_at < '2025-04-01'\n     GROUP BY a.account_id,\n              a.account_number,\n              a.opening_balance)\nSELECT b.account_number,\n       b.book_balance,\n       ROUND(s.ending_balance, 2) AS statement_balance,\n       ROUND(b.book_balance - ROUND(s.ending_balance, 2), 2) AS difference\nFROM book b\nJOIN statements s ON s.account_number = b.account_number\nWHERE s.statement_date = '2025-03-31'\n    AND s.ending_balance IS NOT NULL\n    AND b.book_balance <> ROUND(s.ending_balance, 2)\nORDER BY b.account_number;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "inner_join",
+      "group_by",
+      "date_range",
+      "nulls",
+      "reconciliation"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q08",
+    "category": "full_outer_join",
+    "difficulty": "hard",
+    "question": "Reconcile all local accounts with all imported statements dated March 31, 2025, retaining unmatched records on either side. Return account_number, book_balance, statement_balance, and the rounded book balance minus the rounded statement balance as difference. Book balance uses opening_balance plus postings through March 31. Round monetary outputs to two decimals; use NULL for a missing book balance, a missing or unknown statement balance, and any difference involving NULL. Order by account_number ascending.",
+    "expected_sql": "WITH book AS\n    (SELECT a.account_number,\n            ROUND(a.opening_balance + COALESCE(SUM(l.amount), 0), 2) AS book_balance\n     FROM accounts a\n     LEFT JOIN ledger_entries l ON l.account_id = a.account_id\n     AND l.posted_at < '2025-04-01'\n     GROUP BY a.account_id,\n              a.account_number,\n              a.opening_balance),\n     imported AS\n    (SELECT account_number,\n            ending_balance\n     FROM statements\n     WHERE statement_date = '2025-03-31')\nSELECT COALESCE(b.account_number, s.account_number) AS account_number,\n       b.book_balance,\n       ROUND(s.ending_balance, 2) AS statement_balance,\n       ROUND(b.book_balance - ROUND(s.ending_balance, 2), 2) AS difference\nFROM book b\nFULL OUTER JOIN imported s ON s.account_number = b.account_number\nORDER BY account_number;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "full_outer_join",
+      "group_by",
+      "coalesce",
+      "nulls",
+      "reconciliation"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q09",
+    "category": "window",
+    "difficulty": "hard",
+    "question": "Show every ledger entry with its account running balance, starting from the account opening balance. Within an account, apply entries in posted_at then entry_id order, including all dates. Return account_number, entry_id, posted_at, and running_balance rounded to two decimals. Order the output by account_number, posted_at, and entry_id.",
+    "expected_sql": "SELECT a.account_number,\n       l.entry_id,\n       l.posted_at,\n       ROUND(a.opening_balance + SUM(l.amount) OVER (PARTITION BY a.account_id\n                                                     ORDER BY l.posted_at, l.entry_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS running_balance\nFROM accounts a\nJOIN ledger_entries l ON l.account_id = a.account_id\nORDER BY a.account_number,\n         l.posted_at,\n         l.entry_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "window",
+      "running_total",
+      "ties"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s07_q10",
+    "category": "correlated_subquery",
+    "difficulty": "hard",
+    "question": "Find open accounts whose current balance is strictly below the average current balance of open accounts of the same kind. Current balance includes opening_balance and all postings; include accounts with no entries in the comparison. Compare unrounded balances. Return account_number, kind, and current_balance rounded to two decimals, ordered by account_number.",
+    "expected_sql": "WITH balances AS\n    (SELECT a.account_id,\n            a.account_number,\n            a.kind,\n            a.opening_balance + COALESCE(SUM(l.amount), 0) AS balance\n     FROM accounts a\n     LEFT JOIN ledger_entries l ON l.account_id = a.account_id\n     WHERE a.status = 'open'\n     GROUP BY a.account_id,\n              a.account_number,\n              a.kind,\n              a.opening_balance)\nSELECT b.account_number,\n       b.kind,\n       ROUND(b.balance, 2) AS current_balance\nFROM balances b\nWHERE b.balance <\n        (SELECT AVG(other.balance)\n         FROM balances other\n         WHERE other.kind = b.kind)\nORDER BY b.account_number;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "group_by",
+      "correlated_subquery",
+      "avg",
+      "coalesce"
+    ],
+    "schema_id": "s07_banking"
+  },
+  {
+    "id": "s08_q01",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List active subscriptions. Return subscription_id, customer_id, plan_id, and start_date, ordered by start_date and then subscription_id.",
+    "expected_sql": "SELECT subscription_id,\n       customer_id,\n       plan_id,\n       start_date\nFROM subscriptions\nWHERE status = 'active'\nORDER BY start_date,\n         subscription_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q02",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "Which open invoices have an amount of at least 50? Return invoice_id, billed_on, and amount, ordered by amount descending and then invoice_id.",
+    "expected_sql": "SELECT invoice_id,\n       billed_on,\n       amount\nFROM invoices\nWHERE status = 'open'\n    AND amount >= 50\nORDER BY amount DESC,\n         invoice_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q03",
+    "category": "date_aggregation",
+    "difficulty": "easy",
+    "question": "Show paid invoice revenue by billing month, using the historical invoice amounts. Return month as YYYY-MM and revenue rounded to two decimals. Include only months with paid invoices and order chronologically.",
+    "expected_sql": "SELECT strftime('%Y-%m', billed_on) AS MONTH,\n       ROUND(SUM(amount), 2) AS revenue\nFROM invoices\nWHERE status = 'paid'\nGROUP BY MONTH\nORDER BY MONTH;",
+    "order_sensitive": true,
+    "features": [
+      "date_grouping",
+      "group_by",
+      "sum",
+      "historical_values"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q04",
+    "category": "left_join",
+    "difficulty": "medium",
+    "question": "For every customer, return customer_id, name, and total paid invoice amount across all their subscriptions, regardless of subscription status. Include customers with no paid invoices as zero, round the total to two decimals, and order by customer_id.",
+    "expected_sql": "SELECT c.customer_id,\n       c.name,\n       ROUND(COALESCE(SUM(i.amount), 0), 2) AS paid_total\nFROM customers c\nLEFT JOIN subscriptions s ON s.customer_id = c.customer_id\nLEFT JOIN invoices i ON i.subscription_id = s.subscription_id\nAND i.status = 'paid'\nGROUP BY c.customer_id,\n         c.name\nORDER BY c.customer_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "join_filter",
+      "group_by",
+      "sum",
+      "coalesce",
+      "zero_inclusion"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q05",
+    "category": "right_join",
+    "difficulty": "medium",
+    "question": "For every plan, including plans with no active subscriptions, return plan_id, name, and active_subscription_count. Count status active only and order by plan_id.",
+    "expected_sql": "SELECT p.plan_id,\n       p.name,\n       COUNT(s.subscription_id) AS active_subscription_count\nFROM subscriptions s\nRIGHT JOIN plans p ON p.plan_id = s.plan_id\nAND s.status = 'active'\nGROUP BY p.plan_id,\n         p.name\nORDER BY p.plan_id;",
+    "order_sensitive": true,
+    "features": [
+      "right_join",
+      "join_filter",
+      "group_by",
+      "count",
+      "zero_inclusion"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q06",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Which subscriptions exceeded their plan included_units allowance during January 2025? Ignore subscription status. Return subscription_id, plan name, January units used, and units above the allowance. Include only positive overages and order by subscription_id.",
+    "expected_sql": "SELECT s.subscription_id,\n       p.name,\n       SUM(u.units) AS units_used,\n       SUM(u.units) - p.included_units AS overage_units\nFROM subscriptions s\nJOIN plans p ON p.plan_id = s.plan_id\nJOIN usage_events u ON u.subscription_id = s.subscription_id\nWHERE u.used_on >= '2025-01-01'\n    AND u.used_on < '2025-02-01'\nGROUP BY s.subscription_id,\n         p.name,\n         p.included_units\nHAVING SUM(u.units) > p.included_units\nORDER BY s.subscription_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "having",
+      "sum",
+      "date_range"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q07",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Find customers whose open invoices total at least 50 across all subscriptions. Return customer_id, name, open_invoice_count, and open_amount rounded to two decimals, ordered by customer_id. Exclude paid and void invoices.",
+    "expected_sql": "SELECT c.customer_id,\n       c.name,\n       COUNT(i.invoice_id) AS open_invoice_count,\n       ROUND(SUM(i.amount), 2) AS open_amount\nFROM customers c\nJOIN subscriptions s ON s.customer_id = c.customer_id\nJOIN invoices i ON i.subscription_id = s.subscription_id\nWHERE i.status = 'open'\nGROUP BY c.customer_id,\n         c.name\nHAVING SUM(i.amount) >= 50\nORDER BY c.customer_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "having",
+      "count",
+      "sum"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q08",
+    "category": "correlated_subquery",
+    "difficulty": "hard",
+    "question": "Find subscriptions that have at least one usage event but have never had an invoice of any status. Return subscription_id, customer name, and plan name, ordered by subscription_id.",
+    "expected_sql": "SELECT s.subscription_id,\n       c.name AS customer_name,\n       p.name AS plan_name\nFROM subscriptions s\nJOIN customers c ON c.customer_id = s.customer_id\nJOIN plans p ON p.plan_id = s.plan_id\nWHERE EXISTS\n        (SELECT 1\n         FROM usage_events u\n         WHERE u.subscription_id = s.subscription_id)\n    AND NOT EXISTS\n        (SELECT 1\n         FROM invoices i\n         WHERE i.subscription_id = s.subscription_id)\nORDER BY s.subscription_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "correlated_subquery",
+      "exists",
+      "not_exists"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q09",
+    "category": "window",
+    "difficulty": "hard",
+    "question": "Show each paid invoice together with the running paid revenue for its customer across all subscriptions. Apply invoices in billed_on then invoice_id order within each customer. Return customer_id, invoice_id, billed_on, and running_paid_amount rounded to two decimals. Order by customer_id, billed_on, and invoice_id.",
+    "expected_sql": "SELECT s.customer_id,\n       i.invoice_id,\n       i.billed_on,\n       ROUND(SUM(i.amount) OVER (PARTITION BY s.customer_id\n                                 ORDER BY i.billed_on, i.invoice_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS running_paid_amount\nFROM invoices i\nJOIN subscriptions s ON s.subscription_id = i.subscription_id\nWHERE i.status = 'paid'\nORDER BY s.customer_id,\n         i.billed_on,\n         i.invoice_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "window",
+      "running_total",
+      "ties"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s08_q10",
+    "category": "correlated_subquery",
+    "difficulty": "hard",
+    "question": "Which customers have at least one subscription and have at least one paid invoice for every subscription they have ever held, including cancelled or paused subscriptions? Return customer_id and name, ordered by customer_id.",
+    "expected_sql": "SELECT c.customer_id,\n       c.name\nFROM customers c\nWHERE EXISTS\n        (SELECT 1\n         FROM subscriptions s\n         WHERE s.customer_id = c.customer_id)\n    AND NOT EXISTS\n        (SELECT 1\n         FROM subscriptions s\n         WHERE s.customer_id = c.customer_id\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM invoices i\n                  WHERE i.subscription_id = s.subscription_id\n                      AND i.status = 'paid'))\nORDER BY c.customer_id;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "exists",
+      "not_exists",
+      "universal_condition"
+    ],
+    "schema_id": "s08_subscriptions"
+  },
+  {
+    "id": "s09_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "Which high-priority tickets currently have status open? Return ticket_id, opened_at, and assigned_agent_id, retaining NULL for unassigned tickets. Sort by opened_at ascending, then ticket_id ascending.",
+    "expected_sql": "SELECT ticket_id,\n       opened_at,\n       assigned_agent_id\nFROM tickets\nWHERE priority = 'high'\n    AND status = 'open'\nORDER BY opened_at,\n         ticket_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "nulls"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q02",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count closed tickets for each priority that has at least one closed ticket. Return priority and closed_ticket_count, sorted by priority alphabetically.",
+    "expected_sql": "SELECT priority,\n       COUNT(*) AS closed_ticket_count\nFROM tickets\nWHERE status = 'closed'\nGROUP BY priority\nORDER BY priority;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q03",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List the agents in team 1. Return agent_id and name, sorted by name alphabetically, then agent_id ascending.",
+    "expected_sql": "SELECT agent_id,\n       name\nFROM agents\nWHERE team_id = 1\nORDER BY name,\n         agent_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every team, count its unresolved tickets, meaning status open or pending, including tickets without an assigned agent. Include teams with zero unresolved tickets. Return team_id, team_name, and unresolved_ticket_count, sorted by team_id ascending.",
+    "expected_sql": "SELECT tm.team_id,\n       tm.name AS team_name,\n       COUNT(t.ticket_id) AS unresolved_ticket_count\nFROM teams AS tm\nLEFT JOIN tickets AS t ON t.team_id = tm.team_id\nAND t.status IN ('open',\n                 'pending')\nGROUP BY tm.team_id,\n         tm.name\nORDER BY tm.team_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "group_by",
+      "count",
+      "zero_inclusion"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q05",
+    "category": "conditional_aggregation",
+    "difficulty": "medium",
+    "question": "For every customer, report the number of tickets of any status and the number of those tickets with no assigned agent. Include customers without tickets with both counts zero. Return customer_id, customer_name, ticket_count, and unassigned_ticket_count, sorted by customer_id ascending.",
+    "expected_sql": "SELECT c.customer_id,\n       c.name AS customer_name,\n       COUNT(t.ticket_id) AS ticket_count,\n       SUM(CASE\n               WHEN t.ticket_id IS NOT NULL\n                    AND t.assigned_agent_id IS NULL THEN 1\n               ELSE 0\n           END) AS unassigned_ticket_count\nFROM customers AS c\nLEFT JOIN tickets AS t ON t.customer_id = c.customer_id\nGROUP BY c.customer_id,\n         c.name\nORDER BY c.customer_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "case",
+      "conditional_aggregation",
+      "nulls",
+      "zero_inclusion"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q06",
+    "category": "response_time",
+    "difficulty": "medium",
+    "question": "For each ticket that has received an agent_reply event, find its earliest agent reply and the elapsed hours from opening to that reply. Ignore other event types. Return ticket_id, first_reply_at, and response_hours rounded to two decimal places, sorted by ticket_id ascending.",
+    "expected_sql": "SELECT t.ticket_id,\n       MIN(e.created_at) AS first_reply_at,\n       ROUND((julianday(MIN(e.created_at)) - julianday(t.opened_at)) * 24, 2) AS response_hours\nFROM tickets AS t\nINNER JOIN ticket_events AS e ON e.ticket_id = t.ticket_id\nWHERE e.event_type = 'agent_reply'\nGROUP BY t.ticket_id,\n         t.opened_at\nORDER BY t.ticket_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "min",
+      "date_arithmetic"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q07",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Which agents are assigned at least two tickets with status closed? Return agent_id, agent_name, and closed_ticket_count. Sort by closed_ticket_count descending, then agent_id ascending.",
+    "expected_sql": "SELECT a.agent_id,\n       a.name AS agent_name,\n       COUNT(t.ticket_id) AS closed_ticket_count\nFROM agents AS a\nINNER JOIN tickets AS t ON t.assigned_agent_id = a.agent_id\nWHERE t.status = 'closed'\nGROUP BY a.agent_id,\n         a.name\nHAVING COUNT(t.ticket_id) >= 2\nORDER BY closed_ticket_count DESC,\n         a.agent_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "having",
+      "count"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q08",
+    "category": "window_ranking",
+    "difficulty": "hard",
+    "question": "Find the oldest unresolved ticket, meaning status open or pending, for each team that has one. Exclude tickets without a team. If a team has several tickets opened at the same time, choose the lowest ticket_id. Return team_id, team_name, ticket_id, and opened_at, sorted by team_id ascending.",
+    "expected_sql": "WITH ranked AS\n    (SELECT team_id,\n            ticket_id,\n            opened_at,\n            ROW_NUMBER() OVER (PARTITION BY team_id\n                               ORDER BY opened_at, ticket_id) AS POSITION\n     FROM tickets\n     WHERE status IN ('open',\n                      'pending')\n         AND team_id IS NOT NULL)\nSELECT tm.team_id,\n       tm.name AS team_name,\n       r.ticket_id,\n       r.opened_at\nFROM ranked AS r\nINNER JOIN teams AS tm ON tm.team_id = r.team_id\nWHERE r.position = 1\nORDER BY tm.team_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "row_number",
+      "window",
+      "inner_join",
+      "tie_break"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q09",
+    "category": "full_outer_join",
+    "difficulty": "hard",
+    "question": "Build a complete assignment roster showing every ticket of any status with its assigned agent, every unassigned ticket with NULL agent fields, and every agent with no tickets with NULL ticket fields. Return agent_id, agent_name, ticket_id, and status. Sort by agent_id ascending with NULL agents last, then ticket_id ascending with NULL tickets last.",
+    "expected_sql": "SELECT a.agent_id,\n       a.name AS agent_name,\n       t.ticket_id,\n       t.status\nFROM tickets AS t\nFULL OUTER JOIN agents AS a ON a.agent_id = t.assigned_agent_id\nORDER BY a.agent_id IS NULL,\n                       a.agent_id,\n                       t.ticket_id IS NULL,\n                                      t.ticket_id;",
+    "order_sensitive": true,
+    "features": [
+      "full_outer_join",
+      "nulls",
+      "order_by"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s09_q10",
+    "category": "window_ranking",
+    "difficulty": "hard",
+    "question": "For each team, identify all agents tied for the largest number of assigned unresolved tickets, meaning status open or pending. Exclude teams where every agent has zero assigned unresolved tickets. Count workload by the agent's team, and ignore unassigned tickets. Return team_id, team_name, agent_id, agent_name, and unresolved_ticket_count, sorted by team_id ascending, then agent_id ascending.",
+    "expected_sql": "WITH workloads AS\n    (SELECT a.team_id,\n            a.agent_id,\n            a.name AS agent_name,\n            COUNT(t.ticket_id) AS unresolved_ticket_count\n     FROM agents AS a\n     LEFT JOIN tickets AS t ON t.assigned_agent_id = a.agent_id\n     AND t.status IN ('open',\n                      'pending')\n     GROUP BY a.team_id,\n              a.agent_id,\n              a.name),\n     ranked AS\n    (SELECT *,\n            DENSE_RANK() OVER (PARTITION BY team_id\n                               ORDER BY unresolved_ticket_count DESC) AS POSITION\n     FROM workloads)\nSELECT tm.team_id,\n       tm.name AS team_name,\n       r.agent_id,\n       r.agent_name,\n       r.unresolved_ticket_count\nFROM ranked AS r\nINNER JOIN teams AS tm ON tm.team_id = r.team_id\nWHERE r.position = 1\n    AND r.unresolved_ticket_count > 0\nORDER BY tm.team_id,\n         r.agent_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "inner_join",
+      "group_by",
+      "dense_rank",
+      "window",
+      "ties"
+    ],
+    "schema_id": "s09_support"
+  },
+  {
+    "id": "s10_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "Which rooms have a current nightly_rate of 160 or less? Return room_number, room_type, and nightly_rate. Sort by nightly_rate descending, then room_number ascending.",
+    "expected_sql": "SELECT room_number,\n       room_type,\n       nightly_rate\nFROM rooms\nWHERE nightly_rate <= 160\nORDER BY nightly_rate DESC,\n         room_number;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q02",
+    "category": "date_filtering",
+    "difficulty": "easy",
+    "question": "List confirmed bookings whose check-in date falls in February or March 2025. Return booking_id, check_in, and check_out, sorted by check_in ascending, then booking_id ascending.",
+    "expected_sql": "SELECT booking_id,\n       check_in,\n       check_out\nFROM bookings\nWHERE status = 'confirmed'\n    AND check_in >= '2025-02-01'\n    AND check_in < '2025-04-01'\nORDER BY check_in,\n         booking_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "date_range"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q03",
+    "category": "date_arithmetic",
+    "difficulty": "easy",
+    "question": "For each checked_out booking, calculate its number of nights and booking value using booked_nightly_rate. Checkout day is excluded. Return booking_id, nights as an integer, and booking_value rounded to two decimal places, sorted by booking_id ascending.",
+    "expected_sql": "SELECT booking_id,\n       CAST(julianday(check_out) - julianday(check_in) AS INTEGER) AS nights,\n       ROUND((julianday(check_out) - julianday(check_in)) * booked_nightly_rate, 2) AS booking_value\nFROM bookings\nWHERE status = 'checked_out'\nORDER BY booking_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "date_arithmetic",
+      "historical_values"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q04",
+    "category": "right_join",
+    "difficulty": "medium",
+    "question": "For every room, count checked_out bookings and their total nights, excluding checkout days. Include rooms without checked_out bookings with both totals zero. Return room_id, room_number, completed_booking_count, and total_nights as an integer, sorted by room_number ascending.",
+    "expected_sql": "SELECT r.room_id,\n       r.room_number,\n       COUNT(b.booking_id) AS completed_booking_count,\n       CAST(COALESCE(SUM(julianday(b.check_out) - julianday(b.check_in)), 0) AS INTEGER) AS total_nights\nFROM bookings AS b\nRIGHT JOIN rooms AS r ON r.room_id = b.room_id\nAND b.status = 'checked_out'\nGROUP BY r.room_id,\n         r.room_number\nORDER BY r.room_number;",
+    "order_sensitive": true,
+    "features": [
+      "right_join",
+      "group_by",
+      "count",
+      "sum",
+      "date_arithmetic",
+      "zero_inclusion"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q05",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every guest, total the booking value of their checked_out stays, using each booking's historical booked_nightly_rate multiplied by nights and excluding checkout days. Include guests with no checked_out stays with a zero total. Return guest_id, guest_name, and completed_booking_value rounded to two decimal places, sorted by guest_id ascending.",
+    "expected_sql": "SELECT g.guest_id,\n       g.name AS guest_name,\n       ROUND(COALESCE(SUM((julianday(b.check_out) - julianday(b.check_in)) * b.booked_nightly_rate), 0), 2) AS completed_booking_value\nFROM guests AS g\nLEFT JOIN bookings AS b ON b.guest_id = g.guest_id\nAND b.status = 'checked_out'\nGROUP BY g.guest_id,\n         g.name\nORDER BY g.guest_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "group_by",
+      "sum",
+      "historical_values",
+      "date_arithmetic",
+      "zero_inclusion"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q06",
+    "category": "aggregation",
+    "difficulty": "medium",
+    "question": "How much net cash has been received for checked_out bookings in each room type? Sum signed payments so refunds reduce the total; exclude payments for other booking statuses and unallocated payments. Only include room types with at least one qualifying payment. Return room_type and net_payments rounded to two decimal places, sorted by room_type alphabetically.",
+    "expected_sql": "SELECT r.room_type,\n       ROUND(SUM(p.amount), 2) AS net_payments\nFROM payments AS p\nINNER JOIN bookings AS b ON b.booking_id = p.booking_id\nINNER JOIN rooms AS r ON r.room_id = b.room_id\nWHERE b.status = 'checked_out'\nGROUP BY r.room_type\nORDER BY r.room_type;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "group_by",
+      "sum",
+      "signed_amount"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q07",
+    "category": "having",
+    "difficulty": "medium",
+    "question": "Which checked_out bookings still have a positive outstanding balance? Balance equals nights excluding checkout day times booked_nightly_rate, minus all signed payments for that booking; treat no payments as zero. Return booking_id, guest_name, room_number, and outstanding_balance rounded to two decimal places, sorted by booking_id ascending. Test positivity before rounding.",
+    "expected_sql": "SELECT b.booking_id,\n       g.name AS guest_name,\n       r.room_number,\n       ROUND((julianday(b.check_out) - julianday(b.check_in)) * b.booked_nightly_rate - COALESCE(SUM(p.amount), 0), 2) AS outstanding_balance\nFROM bookings AS b\nINNER JOIN guests AS g ON g.guest_id = b.guest_id\nINNER JOIN rooms AS r ON r.room_id = b.room_id\nLEFT JOIN payments AS p ON p.booking_id = b.booking_id\nWHERE b.status = 'checked_out'\nGROUP BY b.booking_id,\n         g.name,\n         r.room_number,\n         b.check_in,\n         b.check_out,\n         b.booked_nightly_rate\nHAVING (julianday(b.check_out) - julianday(b.check_in)) * b.booked_nightly_rate - COALESCE(SUM(p.amount), 0) > 0\nORDER BY b.booking_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "left_join",
+      "group_by",
+      "having",
+      "historical_values",
+      "signed_amount"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q08",
+    "category": "self_join",
+    "difficulty": "hard",
+    "question": "Find overlapping pairs of bookings for the same room, considering only confirmed and checked_out bookings. A booking occupies [check_in, check_out), so a checkout on another booking's check-in date is not an overlap. Return each pair once, with the lower booking_id first. Return room_number, first_booking_id, and second_booking_id, sorted by room_number, first_booking_id, then second_booking_id, all ascending.",
+    "expected_sql": "SELECT r.room_number,\n       a.booking_id AS first_booking_id,\n       b.booking_id AS second_booking_id\nFROM bookings AS a\nINNER JOIN bookings AS b ON b.room_id = a.room_id\nAND a.booking_id < b.booking_id\nAND a.check_in < b.check_out\nAND b.check_in < a.check_out\nINNER JOIN rooms AS r ON r.room_id = a.room_id\nWHERE a.status IN ('confirmed',\n                   'checked_out')\n    AND b.status IN ('confirmed',\n                     'checked_out')\nORDER BY r.room_number,\n         a.booking_id,\n         b.booking_id;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "inner_join",
+      "date_overlap",
+      "deduplication"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q09",
+    "category": "window_ranking",
+    "difficulty": "hard",
+    "question": "Within each room type, find every room tied for the highest total booking value from checked_out stays. Use historical booked_nightly_rate times nights excluding checkout days, and assign zero to rooms without checked_out stays; if every room in a type has zero, return all of them. Return room_type, room_number, and completed_booking_value rounded to two decimal places. Rank using unrounded totals and sort by room_type alphabetically, then room_number ascending.",
+    "expected_sql": "WITH room_values AS\n    (SELECT r.room_id,\n            r.room_number,\n            r.room_type,\n            COALESCE(SUM((julianday(b.check_out) - julianday(b.check_in)) * b.booked_nightly_rate), 0) AS booking_value\n     FROM rooms AS r\n     LEFT JOIN bookings AS b ON b.room_id = r.room_id\n     AND b.status = 'checked_out'\n     GROUP BY r.room_id,\n              r.room_number,\n              r.room_type),\n     ranked AS\n    (SELECT *,\n            DENSE_RANK() OVER (PARTITION BY room_type\n                               ORDER BY booking_value DESC) AS POSITION\n     FROM room_values)\nSELECT room_type,\n       room_number,\n       ROUND(booking_value, 2) AS completed_booking_value\nFROM ranked\nWHERE POSITION = 1\nORDER BY room_type,\n         room_number;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "left_join",
+      "group_by",
+      "dense_rank",
+      "window",
+      "ties",
+      "zero_inclusion",
+      "historical_values"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s10_q10",
+    "category": "subquery_aggregation",
+    "difficulty": "hard",
+    "question": "Which guests have at least two checked_out stays and an average stay length strictly above the average length across all checked_out bookings? Compute nights excluding checkout day, and compare the unrounded averages; the overall average is per booking, not per guest. Return guest_id, guest_name, and average_nights rounded to two decimal places, sorted by guest_id ascending.",
+    "expected_sql": "WITH completed_stays AS\n    (SELECT guest_id,\n            julianday(check_out) - julianday(check_in) AS nights\n     FROM bookings\n     WHERE status = 'checked_out')\nSELECT g.guest_id,\n       g.name AS guest_name,\n       ROUND(AVG(s.nights), 2) AS average_nights\nFROM guests AS g\nINNER JOIN completed_stays AS s ON s.guest_id = g.guest_id\nGROUP BY g.guest_id,\n         g.name\nHAVING COUNT(*) >= 2\nAND AVG(s.nights) >\n    (SELECT AVG(nights)\n     FROM completed_stays)\nORDER BY g.guest_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "inner_join",
+      "group_by",
+      "having",
+      "scalar_subquery",
+      "avg",
+      "date_arithmetic"
+    ],
+    "schema_id": "s10_hospitality"
+  },
+  {
+    "id": "s11_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List raw parts with a unit cost of at least 3. Return part_id, name, unit_cost, ordered by unit_cost descending and then part_id ascending.",
+    "expected_sql": "SELECT id AS part_id,\n       name,\n       unit_cost\nFROM parts\nWHERE kind = 'raw'\n    AND unit_cost >= 3\nORDER BY unit_cost DESC,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "comparison",
+      "multi_column_order"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q02",
+    "category": "date_filtering",
+    "difficulty": "easy",
+    "question": "List work orders whose status is planned or in_progress and whose due date is before 2025-02-15. Return work_order_id, part_id, quantity, due_date, ordered by due_date and then work_order_id ascending.",
+    "expected_sql": "SELECT id AS work_order_id,\n       part_id,\n       quantity,\n       due_date\nFROM work_orders\nWHERE status IN ('planned',\n                 'in_progress')\n    AND due_date < '2025-02-15'\nORDER BY due_date,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "in_filter",
+      "date_boundary",
+      "multi_column_order"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q03",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count work orders in each status that occurs. Return status, work_order_count, ordered by status alphabetically.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS work_order_count\nFROM work_orders\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every part, report the total quantity on work orders with status planned or in_progress, using zero when there are none. Return part_id, name, active_quantity, ordered by part_id ascending.",
+    "expected_sql": "SELECT p.id AS part_id,\n       p.name,\n       COALESCE(SUM(w.quantity), 0) AS active_quantity\nFROM parts AS p\nLEFT JOIN work_orders AS w ON w.part_id = p.id\nAND w.status IN ('planned',\n                 'in_progress')\nGROUP BY p.id,\n         p.name\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_join",
+      "sum",
+      "coalesce",
+      "unmatched_rows"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q05",
+    "category": "date_arithmetic",
+    "difficulty": "medium",
+    "question": "Show completed work orders that finished after their due date. Return work_order_id, part_name, days_late as an integer calendar-day difference, quantity, ordered by work_order_id ascending.",
+    "expected_sql": "SELECT w.id AS work_order_id,\n       p.name AS part_name,\n       CAST(julianday(w.completed_date) - julianday(w.due_date) AS INTEGER) AS days_late,\n       w.quantity\nFROM work_orders AS w\nJOIN parts AS p ON p.id = w.part_id\nWHERE w.status = 'completed'\n    AND w.completed_date > w.due_date\nORDER BY w.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "date_arithmetic",
+      "cast",
+      "comparison"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q06",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every part classified as assembly, count its distinct direct component parts and sum their direct quantities per one assembly unit. Use zero for both values when the assembly has no components. Return part_id, name, component_count, component_quantity, ordered by part_id ascending.",
+    "expected_sql": "SELECT p.id AS part_id,\n       p.name,\n       COUNT(b.component_part_id) AS component_count,\n       COALESCE(SUM(b.quantity), 0) AS component_quantity\nFROM parts AS p\nLEFT JOIN bom AS b ON b.parent_part_id = p.id\nWHERE p.kind = 'assembly'\nGROUP BY p.id,\n         p.name\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count",
+      "sum",
+      "coalesce",
+      "unmatched_rows"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q07",
+    "category": "fanout_safe_aggregation",
+    "difficulty": "medium",
+    "question": "For each part with at least one completed work order, show the total completed quantity and the number of distinct direct component parts in its bill of materials. The completed quantity must count each work order once; a part without direct components has a component count of zero. Return part_id, name, completed_quantity, component_count, ordered by part_id ascending.",
+    "expected_sql": "WITH completed AS\n    (SELECT part_id,\n            SUM(quantity) AS completed_quantity\n     FROM work_orders\n     WHERE status = 'completed'\n     GROUP BY part_id),\n     components AS\n    (SELECT parent_part_id,\n            COUNT(*) AS component_count\n     FROM bom\n     GROUP BY parent_part_id)\nSELECT p.id AS part_id,\n       p.name,\n       c.completed_quantity,\n       COALESCE(b.component_count, 0) AS component_count\nFROM completed AS c\nJOIN parts AS p ON p.id = c.part_id\nLEFT JOIN components AS b ON b.parent_part_id = p.id\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "preaggregation",
+      "fanout",
+      "inner_join",
+      "left_join",
+      "coalesce"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q08",
+    "category": "window_navigation",
+    "difficulty": "hard",
+    "question": "For each completed work order, show the previous completed work order date for the same part and the integer calendar-day gap from it. Within each part, sequence completed orders by completed_date and then work_order_id ascending; the first order has NULL for the previous date and gap. Return part_id, work_order_id, completed_date, previous_completed_date, gap_days, ordered by part_id, completed_date, work_order_id ascending.",
+    "expected_sql": "WITH history AS\n    (SELECT part_id,\n            id AS work_order_id,\n            completed_date,\n            LAG(completed_date) OVER (PARTITION BY part_id\n                                      ORDER BY completed_date, id) AS previous_completed_date\n     FROM work_orders\n     WHERE status = 'completed')\nSELECT part_id,\n       work_order_id,\n       completed_date,\n       previous_completed_date,\n       CAST(julianday(completed_date) - julianday(previous_completed_date) AS INTEGER) AS gap_days\nFROM history\nORDER BY part_id,\n         completed_date,\n         work_order_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "lag",
+      "partition_by",
+      "date_arithmetic",
+      "null_first_row"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q09",
+    "category": "recursive_bom",
+    "difficulty": "hard",
+    "question": "Calculate the leaf-material requirements for building three Desk lamps (part_id 1). A leaf material is a descendant with no components of its own. Multiply quantities along each path, add quantities when a leaf appears along multiple paths, and price the resulting quantity at the leaf part's unit_cost. Return leaf_part_id, name, required_quantity, material_cost rounded to two decimal places, ordered by leaf_part_id ascending.",
+    "expected_sql": "WITH RECURSIVE requirements(part_id, required_quantity) AS\n    (SELECT component_part_id,\n            quantity * 3\n     FROM bom\n     WHERE parent_part_id = 1\n     UNION ALL SELECT b.component_part_id,\n                      r.required_quantity * b.quantity\n     FROM requirements AS r\n     JOIN bom AS b ON b.parent_part_id = r.part_id)\nSELECT p.id AS leaf_part_id,\n       p.name,\n       SUM(r.required_quantity) AS required_quantity,\n       ROUND(SUM(r.required_quantity) * p.unit_cost, 2) AS material_cost\nFROM requirements AS r\nJOIN parts AS p ON p.id = r.part_id\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM bom AS b\n         WHERE b.parent_part_id = r.part_id)\nGROUP BY p.id,\n         p.name,\n         p.unit_cost\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "recursive_cte",
+      "union_all",
+      "multi_path_aggregation",
+      "not_exists",
+      "round"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s11_q10",
+    "category": "recursive_bom",
+    "difficulty": "hard",
+    "question": "For every ancestor part that has components, list all its direct and indirect descendant parts. For one unit of the ancestor, multiply quantities along each path and add the quantities across all paths to the same descendant. Exclude the ancestor itself. Return ancestor_part_id, descendant_part_id, required_quantity, ordered by ancestor_part_id and then descendant_part_id ascending.",
+    "expected_sql": "WITH RECURSIVE paths(ancestor_part_id, descendant_part_id, required_quantity) AS\n    (SELECT parent_part_id,\n            component_part_id,\n            quantity\n     FROM bom\n     UNION ALL SELECT p.ancestor_part_id,\n                      b.component_part_id,\n                      p.required_quantity * b.quantity\n     FROM paths AS p\n     JOIN bom AS b ON b.parent_part_id = p.descendant_part_id)\nSELECT ancestor_part_id,\n       descendant_part_id,\n       SUM(required_quantity) AS required_quantity\nFROM paths\nWHERE ancestor_part_id <> descendant_part_id\nGROUP BY ancestor_part_id,\n         descendant_part_id\nORDER BY ancestor_part_id,\n         descendant_part_id;",
+    "order_sensitive": true,
+    "features": [
+      "recursive_cte",
+      "transitive_closure",
+      "union_all",
+      "multi_path_aggregation"
+    ],
+    "schema_id": "s11_manufacturing"
+  },
+  {
+    "id": "s12_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List products with a reorder level of at least five units. Return product_id, sku, name, reorder_level, ordered by reorder_level descending and then product_id ascending.",
+    "expected_sql": "SELECT id AS product_id,\n       sku,\n       name,\n       reorder_level\nFROM products\nWHERE reorder_level >= 5\nORDER BY reorder_level DESC,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "comparison",
+      "multi_column_order"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q02",
+    "category": "date_filtering",
+    "difficulty": "easy",
+    "question": "List recorded movements with a negative quantity change during January 2025, regardless of reason. Return movement_id, warehouse_id, product_id, movement_date, quantity_change, ordered by movement_date and then movement_id ascending.",
+    "expected_sql": "SELECT id AS movement_id,\n       warehouse_id,\n       product_id,\n       movement_date,\n       quantity_change\nFROM movements\nWHERE quantity_change < 0\n    AND movement_date >= '2025-01-01'\n    AND movement_date < '2025-02-01'\nORDER BY movement_date,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "negative_values",
+      "date_boundary",
+      "filter"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q03",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "For each warehouse with at least one stock record, total its on-hand units across those records. Return warehouse_id, total_on_hand, ordered by warehouse_id ascending.",
+    "expected_sql": "SELECT warehouse_id,\n       SUM(on_hand) AS total_on_hand\nFROM stock\nGROUP BY warehouse_id\nORDER BY warehouse_id;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "sum",
+      "zero_values"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every warehouse, show its total on-hand units and number of stock records. Count a stock record even when on_hand is zero; report zero for both metrics when the warehouse has no records. Return warehouse_id, name, total_on_hand, stock_record_count, ordered by warehouse_id ascending.",
+    "expected_sql": "SELECT w.id AS warehouse_id,\n       w.name,\n       COALESCE(SUM(s.on_hand), 0) AS total_on_hand,\n       COUNT(s.product_id) AS stock_record_count\nFROM warehouses AS w\nLEFT JOIN stock AS s ON s.warehouse_id = w.id\nGROUP BY w.id,\n         w.name\nORDER BY w.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count",
+      "coalesce",
+      "unmatched_rows",
+      "zero_values"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q05",
+    "category": "complete_grid",
+    "difficulty": "medium",
+    "question": "List every warehouse/product combination, treating a missing stock record as zero units on hand. Return warehouse_id, product_id, on_hand, ordered by warehouse_id and then product_id ascending.",
+    "expected_sql": "SELECT w.id AS warehouse_id,\n       p.id AS product_id,\n       COALESCE(s.on_hand, 0) AS on_hand\nFROM warehouses AS w\nCROSS JOIN products AS p\nLEFT JOIN stock AS s ON s.warehouse_id = w.id\nAND s.product_id = p.id\nORDER BY w.id,\n         p.id;",
+    "order_sensitive": true,
+    "features": [
+      "cross_join",
+      "left_join",
+      "composite_join",
+      "coalesce",
+      "complete_grid"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q06",
+    "category": "fanout_safe_aggregation",
+    "difficulty": "medium",
+    "question": "For every product, show total current on-hand units across warehouses and the net sum of all quantity changes recorded during January 2025. Compute the two totals independently, using zero when a product has no stock or no January movements. Return product_id, name, total_on_hand, january_net_change, ordered by product_id ascending.",
+    "expected_sql": "WITH balances AS\n    (SELECT product_id,\n            SUM(on_hand) AS total_on_hand\n     FROM stock\n     GROUP BY product_id),\n     changes AS\n    (SELECT product_id,\n            SUM(quantity_change) AS january_net_change\n     FROM movements\n     WHERE movement_date >= '2025-01-01'\n         AND movement_date < '2025-02-01'\n     GROUP BY product_id)\nSELECT p.id AS product_id,\n       p.name,\n       COALESCE(b.total_on_hand, 0) AS total_on_hand,\n       COALESCE(c.january_net_change, 0) AS january_net_change\nFROM products AS p\nLEFT JOIN balances AS b ON b.product_id = p.id\nLEFT JOIN changes AS c ON c.product_id = p.id\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "preaggregation",
+      "fanout",
+      "left_join",
+      "date_boundary",
+      "coalesce"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q07",
+    "category": "null_and_date_filtering",
+    "difficulty": "medium",
+    "question": "Find existing stock records whose last count was before 2025-01-10 or whose last-count date is unknown. Return warehouse_id, warehouse_name, product_id, product_name, on_hand, last_counted, ordered by warehouse_id and then product_id ascending.",
+    "expected_sql": "SELECT s.warehouse_id,\n       w.name AS warehouse_name,\n       s.product_id,\n       p.name AS product_name,\n       s.on_hand,\n       s.last_counted\nFROM stock AS s\nJOIN warehouses AS w ON w.id = s.warehouse_id\nJOIN products AS p ON p.id = s.product_id\nWHERE s.last_counted < '2025-01-10'\n    OR s.last_counted IS NULL\nORDER BY s.warehouse_id,\n         s.product_id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "is_null",
+      "or_filter",
+      "date_boundary"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q08",
+    "category": "running_total",
+    "difficulty": "hard",
+    "question": "For every movement at warehouse 1, calculate the running net quantity change for that product, beginning at zero before its first recorded movement. Sequence each product's movements by movement_date and then movement_id ascending. Return movement_id, product_id, movement_date, quantity_change, running_net_change, ordered by product_id, movement_date, movement_id ascending.",
+    "expected_sql": "SELECT id AS movement_id,\n       product_id,\n       movement_date,\n       quantity_change,\n       SUM(quantity_change) OVER (PARTITION BY product_id\n                                  ORDER BY movement_date, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_net_change\nFROM movements\nWHERE warehouse_id = 1\nORDER BY product_id,\n         movement_date,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "sum_window",
+      "running_total",
+      "partition_by",
+      "rows_frame",
+      "negative_values"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q09",
+    "category": "window_ranking",
+    "difficulty": "hard",
+    "question": "Rank existing stock records within each warehouse by on_hand descending. Equal quantities share a rank and the next different quantity receives the next consecutive rank with no gaps. Return warehouse_id, product_id, on_hand, stock_rank, ordered by warehouse_id, stock_rank, product_id ascending.",
+    "expected_sql": "SELECT warehouse_id,\n       product_id,\n       on_hand,\n       DENSE_RANK() OVER (PARTITION BY warehouse_id\n                          ORDER BY on_hand DESC) AS stock_rank\nFROM stock\nORDER BY warehouse_id,\n         stock_rank,\n         product_id;",
+    "order_sensitive": true,
+    "features": [
+      "dense_rank",
+      "partition_by",
+      "ties",
+      "zero_values"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s12_q10",
+    "category": "window_navigation",
+    "difficulty": "hard",
+    "question": "For each movement whose reason is outbound, show the date of the immediately following recorded movement for the same warehouse and product, considering all reasons when finding that following movement. Sequence movements by movement_date and then movement_id ascending. Return movement_id, warehouse_id, product_id, movement_date, next_movement_date, gap_days as an integer calendar-day difference; use NULL for the final two columns if there is no later movement. Order by movement_id ascending.",
+    "expected_sql": "WITH sequenced AS\n    (SELECT id AS movement_id,\n            warehouse_id,\n            product_id,\n            movement_date,\n            reason,\n            LEAD(movement_date) OVER (PARTITION BY warehouse_id, product_id\n                                      ORDER BY movement_date, id) AS next_movement_date\n     FROM movements)\nSELECT movement_id,\n       warehouse_id,\n       product_id,\n       movement_date,\n       next_movement_date,\n       CAST(julianday(next_movement_date) - julianday(movement_date) AS INTEGER) AS gap_days\nFROM sequenced\nWHERE reason = 'outbound'\nORDER BY movement_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "lead",
+      "composite_partition",
+      "filter_after_window",
+      "date_arithmetic",
+      "null_last_row"
+    ],
+    "schema_id": "s12_inventory"
+  },
+  {
+    "id": "s13_q01",
+    "category": "null_filtering",
+    "difficulty": "easy",
+    "question": "List meters with no retirement date. Return meter_id, label, site_id, ordered by meter_id ascending.",
+    "expected_sql": "SELECT id AS meter_id,\n       label,\n       site_id\nFROM meters\nWHERE retired_on IS NULL\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "is_null",
+      "filter"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q02",
+    "category": "date_filtering",
+    "difficulty": "easy",
+    "question": "List nonmissing energy readings recorded on 2025-01-02 UTC. Return reading_id, meter_id, reading_at, reading_kwh, ordered by reading_at and then reading_id ascending.",
+    "expected_sql": "SELECT id AS reading_id,\n       meter_id,\n       reading_at,\n       reading_kwh\nFROM readings\nWHERE reading_kwh IS NOT NULL\n    AND reading_at >= '2025-01-02 00:00:00'\n    AND reading_at < '2025-01-03 00:00:00'\nORDER BY reading_at,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "is_not_null",
+      "timestamp_boundary",
+      "multi_column_order"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q03",
+    "category": "null_aggregation",
+    "difficulty": "easy",
+    "question": "For every meter represented in the readings table, count its nonmissing readings and show their minimum and maximum kWh values. A meter with only missing readings has count zero and NULL minimum and maximum. Return meter_id, valid_reading_count, minimum_kwh, maximum_kwh, ordered by meter_id ascending.",
+    "expected_sql": "SELECT meter_id,\n       COUNT(reading_kwh) AS valid_reading_count,\n       MIN(reading_kwh) AS minimum_kwh,\n       MAX(reading_kwh) AS maximum_kwh\nFROM readings\nGROUP BY meter_id\nORDER BY meter_id;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count_column",
+      "min",
+      "max",
+      "null_aggregation"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q04",
+    "category": "conditional_aggregation",
+    "difficulty": "medium",
+    "question": "For every site, report its total number of meters and the number with no retirement date. Sites without meters should have zero for both counts. Return site_id, name, meter_count, active_meter_count, ordered by site_id ascending.",
+    "expected_sql": "SELECT s.id AS site_id,\n       s.name,\n       COUNT(m.id) AS meter_count,\n       SUM(CASE\n               WHEN m.id IS NOT NULL\n                    AND m.retired_on IS NULL THEN 1\n               ELSE 0\n           END) AS active_meter_count\nFROM sites AS s\nLEFT JOIN meters AS m ON m.site_id = s.id\nGROUP BY s.id,\n         s.name\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_aggregation",
+      "case",
+      "unmatched_rows",
+      "null_filtering"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q05",
+    "category": "anti_join",
+    "difficulty": "medium",
+    "question": "List meters that have no nonmissing energy reading, including meters with no reading records and meters whose records are all missing. Return meter_id, label, site_name, ordered by meter_id ascending.",
+    "expected_sql": "SELECT m.id AS meter_id,\n       m.label,\n       s.name AS site_name\nFROM meters AS m\nJOIN sites AS s ON s.id = m.site_id\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM readings AS r\n         WHERE r.meter_id = m.id\n             AND r.reading_kwh IS NOT NULL)\nORDER BY m.id;",
+    "order_sensitive": true,
+    "features": [
+      "not_exists",
+      "correlated_subquery",
+      "inner_join",
+      "null_filtering",
+      "unmatched_rows"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q06",
+    "category": "having_aggregation",
+    "difficulty": "medium",
+    "question": "For every meter with at least two nonmissing readings, report the minimum reading, maximum reading, and observed kWh range defined as maximum minus minimum. Return site_id, meter_id, label, minimum_kwh, maximum_kwh, observed_range_kwh rounded to two decimal places, ordered by site_id and then meter_id ascending.",
+    "expected_sql": "SELECT m.site_id,\n       m.id AS meter_id,\n       m.label,\n       MIN(r.reading_kwh) AS minimum_kwh,\n       MAX(r.reading_kwh) AS maximum_kwh,\n       ROUND(MAX(r.reading_kwh) - MIN(r.reading_kwh), 2) AS observed_range_kwh\nFROM meters AS m\nJOIN readings AS r ON r.meter_id = m.id\nGROUP BY m.site_id,\n         m.id,\n         m.label\nHAVING COUNT(r.reading_kwh) >= 2\nORDER BY m.site_id,\n         m.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "having",
+      "count_column",
+      "null_aggregation",
+      "round"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q07",
+    "category": "historical_join",
+    "difficulty": "medium",
+    "question": "For each nonmissing reading with a matching regional tariff, show the tariff effective on that reading's UTC calendar date. The valid_from date is inclusive, valid_to is exclusive, and NULL valid_to has no upper limit. Return reading_id, meter_id, reading_date formatted YYYY-MM-DD, price_per_kwh, ordered by reading_id ascending.",
+    "expected_sql": "SELECT r.id AS reading_id,\n       r.meter_id,\n       DATE(r.reading_at) AS reading_date,\n       t.price_per_kwh\nFROM readings AS r\nJOIN meters AS m ON m.id = r.meter_id\nJOIN sites AS s ON s.id = m.site_id\nJOIN tariffs AS t ON t.region = s.region\nAND DATE(r.reading_at) >= t.valid_from\nAND (t.valid_to IS NULL\n     OR DATE(r.reading_at) < t.valid_to)\nWHERE r.reading_kwh IS NOT NULL\nORDER BY r.id;",
+    "order_sensitive": true,
+    "features": [
+      "historical_join",
+      "range_join",
+      "date",
+      "null_open_interval",
+      "inner_join"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q08",
+    "category": "window_navigation",
+    "difficulty": "hard",
+    "question": "Within each meter, sequence nonmissing readings by reading_at and then reading_id ascending and form intervals between consecutive nonmissing readings. Omit the first reading. Return meter_id, reading_id, reading_at, elapsed_hours rounded to two decimals, consumed_kwh as current minus previous reading rounded to two decimals, average_kw as consumed_kwh divided by elapsed hours rounded to three decimals. Use NULL average_kw for zero elapsed hours. Order by meter_id, reading_at, reading_id ascending.",
+    "expected_sql": "WITH previous AS\n    (SELECT meter_id,\n            id AS reading_id,\n            reading_at,\n            reading_kwh,\n            LAG(reading_at) OVER (PARTITION BY meter_id\n                                  ORDER BY reading_at, id) AS previous_at,\n            LAG(reading_kwh) OVER (PARTITION BY meter_id\n                                   ORDER BY reading_at, id) AS previous_kwh\n     FROM readings\n     WHERE reading_kwh IS NOT NULL),\n     intervals AS\n    (SELECT meter_id,\n            reading_id,\n            reading_at,\n            (julianday(reading_at) - julianday(previous_at)) * 24 AS elapsed_hours,\n            reading_kwh - previous_kwh AS consumed_kwh\n     FROM previous\n     WHERE previous_at IS NOT NULL)\nSELECT meter_id,\n       reading_id,\n       reading_at,\n       ROUND(elapsed_hours, 2) AS elapsed_hours,\n       ROUND(consumed_kwh, 2) AS consumed_kwh,\n       ROUND(consumed_kwh / NULLIF(elapsed_hours, 0), 3) AS average_kw\nFROM intervals\nORDER BY meter_id,\n         reading_at,\n         reading_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "lag",
+      "filter_before_window",
+      "date_arithmetic",
+      "nullif",
+      "round"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q09",
+    "category": "moving_average",
+    "difficulty": "hard",
+    "question": "For each meter, derive consumed kWh between consecutive nonmissing readings, sequencing by reading_at and then reading_id ascending. Omit the first reading because it has no preceding interval. For every remaining interval, calculate the arithmetic mean of its consumption and up to two preceding interval consumptions for that meter; divide by the number of available intervals, without time weighting. Return meter_id, reading_id, reading_at, consumed_kwh, trailing_mean_kwh, with both kWh outputs rounded to two decimals. Order by meter_id, reading_at, reading_id ascending.",
+    "expected_sql": "WITH previous AS\n    (SELECT meter_id,\n            id AS reading_id,\n            reading_at,\n            reading_kwh,\n            LAG(reading_kwh) OVER (PARTITION BY meter_id\n                                   ORDER BY reading_at, id) AS previous_kwh\n     FROM readings\n     WHERE reading_kwh IS NOT NULL),\n     intervals AS\n    (SELECT meter_id,\n            reading_id,\n            reading_at,\n            reading_kwh - previous_kwh AS consumed_kwh\n     FROM previous\n     WHERE previous_kwh IS NOT NULL)\nSELECT meter_id,\n       reading_id,\n       reading_at,\n       ROUND(consumed_kwh, 2) AS consumed_kwh,\n       ROUND(AVG(consumed_kwh) OVER (PARTITION BY meter_id\n                                     ORDER BY reading_at, reading_id ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS trailing_mean_kwh\nFROM intervals\nORDER BY meter_id,\n         reading_at,\n         reading_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "lag",
+      "avg_window",
+      "moving_average",
+      "rows_frame",
+      "filter_after_window",
+      "round"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s13_q10",
+    "category": "window_ranking",
+    "difficulty": "hard",
+    "question": "Rank meters having at least two nonmissing readings by observed consumption, defined as maximum minus minimum reading, in descending order. Equal unrounded consumption values share a rank, and the next rank skips the number of tied positions. Return meter_id, label, observed_consumption_kwh rounded to two decimals, consumption_rank, ordered by consumption_rank and then meter_id ascending.",
+    "expected_sql": "WITH consumption AS\n    (SELECT m.id AS meter_id,\n            m.label,\n            MAX(r.reading_kwh) - MIN(r.reading_kwh) AS observed_consumption_kwh\n     FROM meters AS m\n     JOIN readings AS r ON r.meter_id = m.id\n     GROUP BY m.id,\n              m.label\n     HAVING COUNT(r.reading_kwh) >= 2)\nSELECT meter_id,\n       label,\n       ROUND(observed_consumption_kwh, 2) AS observed_consumption_kwh,\n       RANK() OVER (\n                    ORDER BY observed_consumption_kwh DESC) AS consumption_rank\nFROM consumption\nORDER BY consumption_rank,\n         meter_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "rank",
+      "ties",
+      "having",
+      "null_aggregation",
+      "round"
+    ],
+    "schema_id": "s13_energy"
+  },
+  {
+    "id": "s14_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List active routes. Return route_id, name, ordered by route_id ascending.",
+    "expected_sql": "SELECT id AS route_id,\n       name\nFROM routes\nWHERE active = 1\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "boolean_filter",
+      "order_by"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q02",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List stops in the Central zone. Return stop_id, name, ordered by stop_id ascending.",
+    "expected_sql": "SELECT id AS stop_id,\n       name\nFROM stops\nWHERE ZONE = 'Central'\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "equality_filter",
+      "order_by"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q03",
+    "category": "date_aggregation",
+    "difficulty": "easy",
+    "question": "Count trips in each status occurring from service date 2025-01-01 through 2025-01-03, both dates inclusive. Return status, trip_count, ordered by status alphabetically.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS trip_count\nFROM trips\nWHERE service_date >= '2025-01-01'\n    AND service_date <= '2025-01-03'\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "date_boundary",
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every route, report its number of listed stop positions and highest stop sequence. A route with no listed stops has stop_count zero and last_stop_sequence NULL. Return route_id, name, stop_count, last_stop_sequence, ordered by route_id ascending.",
+    "expected_sql": "SELECT r.id AS route_id,\n       r.name,\n       COUNT(rs.stop_sequence) AS stop_count,\n       MAX(rs.stop_sequence) AS last_stop_sequence\nFROM routes AS r\nLEFT JOIN route_stops AS rs ON rs.route_id = r.id\nGROUP BY r.id,\n         r.name\nORDER BY r.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count_column",
+      "max",
+      "unmatched_rows"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q05",
+    "category": "timestamp_arithmetic",
+    "difficulty": "medium",
+    "question": "For each completed trip with an actual departure recorded, calculate departure delay in minutes as actual departure minus scheduled departure, allowing negative values for early departures. Return trip_id, route_name, delay_minutes rounded to two decimals, ordered by trip_id ascending.",
+    "expected_sql": "SELECT t.id AS trip_id,\n       r.name AS route_name,\n       ROUND((julianday(t.actual_departure) - julianday(t.scheduled_departure)) * 1440, 2) AS delay_minutes\nFROM trips AS t\nJOIN routes AS r ON r.id = t.route_id\nWHERE t.status = 'completed'\n    AND t.actual_departure IS NOT NULL\nORDER BY t.id;",
+    "order_sensitive": true,
+    "features": [
+      "inner_join",
+      "date_arithmetic",
+      "negative_values",
+      "round",
+      "null_filtering"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q06",
+    "category": "fanout_safe_aggregation",
+    "difficulty": "medium",
+    "question": "For every route, report its number of completed trips and number of listed stop positions, counting each trip and each position once. Use zero for missing counts. Return route_id, name, completed_trip_count, stop_count, ordered by route_id ascending.",
+    "expected_sql": "WITH completed AS\n    (SELECT route_id,\n            COUNT(*) AS completed_trip_count\n     FROM trips\n     WHERE status = 'completed'\n     GROUP BY route_id),\n     stop_counts AS\n    (SELECT route_id,\n            COUNT(*) AS stop_count\n     FROM route_stops\n     GROUP BY route_id)\nSELECT r.id AS route_id,\n       r.name,\n       COALESCE(c.completed_trip_count, 0) AS completed_trip_count,\n       COALESCE(s.stop_count, 0) AS stop_count\nFROM routes AS r\nLEFT JOIN completed AS c ON c.route_id = r.id\nLEFT JOIN stop_counts AS s ON s.route_id = r.id\nORDER BY r.id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "preaggregation",
+      "fanout",
+      "left_join",
+      "coalesce"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q07",
+    "category": "self_join",
+    "difficulty": "medium",
+    "question": "Show every pair of adjacent stop positions on the same route, where the destination sequence is exactly one greater than the origin sequence. Return route_id, origin_sequence, origin_stop, destination_stop, segment_minutes using the destination position's travel_minutes_from_previous. Order by route_id and then origin_sequence ascending.",
+    "expected_sql": "SELECT a.route_id,\n       a.stop_sequence AS origin_sequence,\n       origin.name AS origin_stop,\n       destination.name AS destination_stop,\n       b.travel_minutes_from_previous AS segment_minutes\nFROM route_stops AS a\nJOIN route_stops AS b ON b.route_id = a.route_id\nAND b.stop_sequence = a.stop_sequence + 1\nJOIN stops AS origin ON origin.id = a.stop_id\nJOIN stops AS destination ON destination.id = b.stop_id\nORDER BY a.route_id,\n         a.stop_sequence;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "composite_join",
+      "inner_join",
+      "adjacency"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q08",
+    "category": "running_total",
+    "difficulty": "hard",
+    "question": "For every listed route stop, calculate planned elapsed travel minutes from the first stop through that position, treating a missing segment time as zero. Return route_id, stop_sequence, stop_name, elapsed_minutes, ordered by route_id and then stop_sequence ascending.",
+    "expected_sql": "SELECT rs.route_id,\n       rs.stop_sequence,\n       s.name AS stop_name,\n       SUM(COALESCE(rs.travel_minutes_from_previous, 0)) OVER (PARTITION BY rs.route_id\n                                                               ORDER BY rs.stop_sequence ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS elapsed_minutes\nFROM route_stops AS rs\nJOIN stops AS s ON s.id = rs.stop_id\nORDER BY rs.route_id,\n         rs.stop_sequence;",
+    "order_sensitive": true,
+    "features": [
+      "sum_window",
+      "running_total",
+      "rows_frame",
+      "partition_by",
+      "coalesce"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q09",
+    "category": "latest_per_group",
+    "difficulty": "hard",
+    "question": "For every route with a completed trip, return exactly its latest completed trip, choosing by service_date descending, then scheduled_departure descending, then trip_id descending. Return route_id, trip_id, service_date, actual_departure, ordered by route_id ascending.",
+    "expected_sql": "WITH ordered AS\n    (SELECT route_id,\n            id AS trip_id,\n            service_date,\n            actual_departure,\n            ROW_NUMBER() OVER (PARTITION BY route_id\n                               ORDER BY service_date DESC, scheduled_departure DESC, id DESC) AS POSITION\n     FROM trips\n     WHERE status = 'completed')\nSELECT route_id,\n       trip_id,\n       service_date,\n       actual_departure\nFROM ordered\nWHERE POSITION = 1\nORDER BY route_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "row_number",
+      "partition_by",
+      "top_per_group",
+      "tie_break"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s14_q10",
+    "category": "window_bucketing",
+    "difficulty": "hard",
+    "question": "Within each route, divide completed trips in chronological order into two batches of sizes differing by at most one. Order trips by service_date, scheduled_departure, and trip_id ascending; batch 1 contains the earlier trips and gets the extra trip when the count is odd. A route with one completed trip uses only batch 1. Return route_id, trip_id, service_date, batch_number, ordered by route_id, service_date, scheduled_departure, trip_id ascending.",
+    "expected_sql": "SELECT route_id,\n       id AS trip_id,\n       service_date,\n       NTILE(2) OVER (PARTITION BY route_id\n                      ORDER BY service_date, scheduled_departure, id) AS batch_number\nFROM trips\nWHERE status = 'completed'\nORDER BY route_id,\n         service_date,\n         scheduled_departure,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "ntile",
+      "partition_by",
+      "tie_break",
+      "uneven_buckets"
+    ],
+    "schema_id": "s14_transport"
+  },
+  {
+    "id": "s15_q01",
+    "category": "date_filtering",
+    "difficulty": "easy",
+    "question": "List visitors whose known signup date is at least 2025-01-02 and before 2025-01-05. Return visitor_id, country, signup_date, ordered by signup_date and then visitor_id ascending.",
+    "expected_sql": "SELECT id AS visitor_id,\n       country,\n       signup_date\nFROM visitors\nWHERE signup_date >= '2025-01-02'\n    AND signup_date < '2025-01-05'\nORDER BY signup_date,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "date_boundary",
+      "null_filtering",
+      "multi_column_order"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q02",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List purchase events with revenue of at least 20. Return event_id, session_id, event_at, revenue, ordered by event_at and then event_id ascending.",
+    "expected_sql": "SELECT id AS event_id,\n       session_id,\n       event_at,\n       revenue\nFROM EVENTS\nWHERE event_type = 'purchase'\n    AND revenue >= 20\nORDER BY event_at,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "equality_filter",
+      "comparison",
+      "multi_column_order"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q03",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count sessions for each device type that occurs. Return device, session_count, ordered by device alphabetically.",
+    "expected_sql": "SELECT device,\n       COUNT(*) AS session_count\nFROM sessions\nGROUP BY device\nORDER BY device;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q04",
+    "category": "outer_join",
+    "difficulty": "medium",
+    "question": "For every visitor, count their sessions, including visitors with no sessions as zero. Return visitor_id, country, session_count, ordered by visitor_id ascending.",
+    "expected_sql": "SELECT v.id AS visitor_id,\n       v.country,\n       COUNT(s.id) AS session_count\nFROM visitors AS v\nLEFT JOIN sessions AS s ON s.visitor_id = v.id\nGROUP BY v.id,\n         v.country\nORDER BY v.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count_column",
+      "unmatched_rows"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q05",
+    "category": "session_aggregation",
+    "difficulty": "medium",
+    "question": "For each session referrer, using direct for NULL, report the number of sessions, the number of sessions containing at least one purchase event, and total purchase-event revenue. Count each session once even when it contains multiple events, retain sessions without events, and use zero revenue when there are no purchases. Return referrer, session_count, converting_session_count, purchase_revenue rounded to two decimals, ordered by referrer alphabetically.",
+    "expected_sql": "SELECT COALESCE(s.referrer, 'direct') AS referrer,\n       COUNT(DISTINCT s.id) AS session_count,\n       COUNT(DISTINCT CASE\n                          WHEN e.event_type = 'purchase' THEN s.id\n                      END) AS converting_session_count,\n       ROUND(COALESCE(SUM(CASE\n                              WHEN e.event_type = 'purchase' THEN e.revenue\n                              ELSE 0\n                          END), 0), 2) AS purchase_revenue\nFROM sessions AS s\nLEFT JOIN EVENTS AS e ON e.session_id = s.id\nGROUP BY COALESCE(s.referrer, 'direct')\nORDER BY referrer;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count_distinct",
+      "conditional_aggregation",
+      "case",
+      "coalesce",
+      "fanout",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q06",
+    "category": "timestamp_aggregation",
+    "difficulty": "medium",
+    "question": "For every session, count its events and calculate the span in whole seconds from its earliest to latest event. Return NULL span for a session with no events and zero for one event. Return session_id, event_count, event_span_seconds, ordered by session_id ascending.",
+    "expected_sql": "SELECT s.id AS session_id,\n       COUNT(e.id) AS event_count,\n       CAST(ROUND((julianday(MAX(e.event_at)) - julianday(MIN(e.event_at))) * 86400) AS INTEGER) AS event_span_seconds\nFROM sessions AS s\nLEFT JOIN EVENTS AS e ON e.session_id = s.id\nGROUP BY s.id\nORDER BY s.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "min",
+      "max",
+      "date_arithmetic",
+      "null_aggregation",
+      "cast",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q07",
+    "category": "conversion_rate",
+    "difficulty": "medium",
+    "question": "For each visitor country with at least one session, calculate its session conversion rate: 100 times the number of sessions containing at least one purchase event divided by all sessions from that country. A session with multiple purchase events counts once. Return country, session_count, converting_session_count, conversion_percent rounded to two decimals, ordered by country alphabetically.",
+    "expected_sql": "WITH session_flags AS\n    (SELECT s.id AS session_id,\n            v.country,\n            MAX(CASE\n                    WHEN e.event_type = 'purchase' THEN 1\n                    ELSE 0\n                END) AS converted\n     FROM sessions AS s\n     JOIN visitors AS v ON v.id = s.visitor_id\n     LEFT JOIN EVENTS AS e ON e.session_id = s.id\n     GROUP BY s.id,\n              v.country)\nSELECT country,\n       COUNT(*) AS session_count,\n       SUM(converted) AS converting_session_count,\n       ROUND(100.0 * SUM(converted) / COUNT(*), 2) AS conversion_percent\nFROM session_flags\nGROUP BY country\nORDER BY country;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "preaggregation",
+      "fanout",
+      "conditional_aggregation",
+      "percentage",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q08",
+    "category": "window_navigation",
+    "difficulty": "hard",
+    "question": "For every session, show the previous session start for the same visitor and the elapsed hours since it. Sequence each visitor's sessions by started_at and then session_id ascending, including ties in start time. The first session has NULL for the previous start and gap. Return visitor_id, session_id, started_at, previous_started_at, gap_hours rounded to two decimals, ordered by visitor_id, started_at, session_id ascending.",
+    "expected_sql": "WITH previous AS\n    (SELECT visitor_id,\n            id AS session_id,\n            started_at,\n            LAG(started_at) OVER (PARTITION BY visitor_id\n                                  ORDER BY started_at, id) AS previous_started_at\n     FROM sessions)\nSELECT visitor_id,\n       session_id,\n       started_at,\n       previous_started_at,\n       ROUND((julianday(started_at) - julianday(previous_started_at)) * 24, 2) AS gap_hours\nFROM previous\nORDER BY visitor_id,\n         started_at,\n         session_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "lag",
+      "partition_by",
+      "date_arithmetic",
+      "tie_break",
+      "null_first_row",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q09",
+    "category": "calendar_windows",
+    "difficulty": "hard",
+    "question": "For each UTC calendar day from 2025-01-01 through 2025-01-04 inclusive, show purchase-event revenue, cumulative revenue since 2025-01-01, and the arithmetic mean of that day's and the preceding calendar day's revenue within this reporting period. Include days without purchases as zero; the first day's mean uses only that day. Return day formatted YYYY-MM-DD, purchase_revenue, cumulative_revenue, two_day_mean_revenue, with all revenue values rounded to two decimals, ordered by day ascending.",
+    "expected_sql": "WITH RECURSIVE calendar(DAY) AS\n    (SELECT '2025-01-01'\n     UNION ALL SELECT DATE(DAY, '+1 day')\n     FROM calendar\n     WHERE DAY < '2025-01-04'),\n               revenue AS\n    (SELECT DATE(event_at) AS DAY,\n            SUM(revenue) AS purchase_revenue\n     FROM EVENTS\n     WHERE event_type = 'purchase'\n         AND event_at >= '2025-01-01 00:00:00'\n         AND event_at < '2025-01-05 00:00:00'\n     GROUP BY DATE(event_at)),\n               daily AS\n    (SELECT c.day,\n            COALESCE(r.purchase_revenue, 0) AS purchase_revenue\n     FROM calendar AS c\n     LEFT JOIN revenue AS r ON r.day = c.day)\nSELECT DAY,\n       ROUND(purchase_revenue, 2) AS purchase_revenue,\n       ROUND(SUM(purchase_revenue) OVER (\n                                         ORDER BY DAY ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS cumulative_revenue,\n       ROUND(AVG(purchase_revenue) OVER (\n                                         ORDER BY DAY ROWS BETWEEN 1 PRECEDING AND CURRENT ROW), 2) AS two_day_mean_revenue\nFROM daily\nORDER BY DAY;",
+    "order_sensitive": true,
+    "features": [
+      "recursive_cte",
+      "calendar",
+      "left_join",
+      "sum_window",
+      "running_total",
+      "avg_window",
+      "moving_average",
+      "rows_frame",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s15_q10",
+    "category": "percentile_ranking",
+    "difficulty": "hard",
+    "question": "For every visitor, total their purchase-event revenue, using zero for visitors without purchases or sessions. Rank visitors by unrounded revenue ascending with equal revenues sharing the first position occupied by that tie group, and calculate percentile_fraction as (rank minus one) divided by (number of visitors minus one); use zero if there is only one visitor. Return visitor_id, country, purchase_revenue rounded to two decimals, percentile_fraction rounded to four decimals, ordered by unrounded purchase revenue and then visitor_id ascending.",
+    "expected_sql": "WITH totals AS\n    (SELECT v.id AS visitor_id,\n            v.country,\n            COALESCE(SUM(CASE\n                             WHEN e.event_type = 'purchase' THEN e.revenue\n                             ELSE 0\n                         END), 0) AS purchase_revenue\n     FROM visitors AS v\n     LEFT JOIN sessions AS s ON s.visitor_id = v.id\n     LEFT JOIN EVENTS AS e ON e.session_id = s.id\n     GROUP BY v.id,\n              v.country)\nSELECT visitor_id,\n       country,\n       ROUND(purchase_revenue, 2) AS purchase_revenue,\n       ROUND(PERCENT_RANK() OVER (\n                                  ORDER BY purchase_revenue), 4) AS percentile_fraction\nFROM totals\nORDER BY totals.purchase_revenue,\n         visitor_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "percent_rank",
+      "ties",
+      "left_join",
+      "unmatched_rows",
+      "conditional_aggregation",
+      "round"
+    ],
+    "schema_id": "s15_web_analytics"
+  },
+  {
+    "id": "s16_q01",
+    "category": "filter_null",
+    "difficulty": "easy",
+    "question": "List open listings without a reserve price. Return listing_id and title, ordered by listing_id.",
+    "expected_sql": "SELECT id AS listing_id,\n       title\nFROM listings\nWHERE status = 'open'\n    AND reserve_price IS NULL\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "is_null"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q02",
+    "category": "aggregation",
+    "difficulty": "easy",
+    "question": "Count listings in each status. Return status and listing_count, ordered by status.",
+    "expected_sql": "SELECT status,\n       COUNT(*) AS listing_count\nFROM listings\nGROUP BY status\nORDER BY status;",
+    "order_sensitive": true,
+    "features": [
+      "group_by",
+      "count"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q03",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List bids of at least 100. Return bid_id, listing_id, bidder_id, and amount, ordered by amount descending and then bid_id ascending.",
+    "expected_sql": "SELECT id AS bid_id,\n       listing_id,\n       bidder_id,\n       amount\nFROM bids\nWHERE amount >= 100\nORDER BY amount DESC,\n         id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "multi_column_order"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q04",
+    "category": "left_join_null",
+    "difficulty": "medium",
+    "question": "For every listing, show listing_id, title, bid_count, and highest_bid. Count actual bids; highest_bid must be NULL for a listing without bids. Order by listing_id.",
+    "expected_sql": "SELECT l.id AS listing_id,\n       l.title,\n       COUNT(b.id) AS bid_count,\n       MAX(b.amount) AS highest_bid\nFROM listings l\nLEFT JOIN bids b ON b.listing_id = l.id\nGROUP BY l.id,\n         l.title\nORDER BY l.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "nulls",
+      "group_by"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q05",
+    "category": "set_union",
+    "difficulty": "medium",
+    "question": "Return the distinct user_id values of users who have listed an item or placed a bid, considering all listing statuses. Order by user_id.",
+    "expected_sql": "SELECT seller_id AS user_id\nFROM listings\nUNION\nSELECT bidder_id AS user_id\nFROM bids\nORDER BY user_id;",
+    "order_sensitive": true,
+    "features": [
+      "union",
+      "duplicate_elimination"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q06",
+    "category": "set_intersection",
+    "difficulty": "medium",
+    "question": "Which users have both listed an item and placed a bid, considering all listing statuses? Return distinct user_id values ascending.",
+    "expected_sql": "SELECT seller_id AS user_id\nFROM listings INTERSECT\nSELECT bidder_id AS user_id\nFROM bids\nORDER BY user_id;",
+    "order_sensitive": true,
+    "features": [
+      "intersect",
+      "duplicate_elimination"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q07",
+    "category": "exists",
+    "difficulty": "medium",
+    "question": "Find open listings whose reserve has been met by at least one bid. A listing with no reserve qualifies only if it has at least one bid. Return listing_id and title, ordered by listing_id.",
+    "expected_sql": "SELECT l.id AS listing_id,\n       l.title\nFROM listings l\nWHERE l.status = 'open'\n    AND EXISTS\n        (SELECT 1\n         FROM bids b\n         WHERE b.listing_id = l.id\n             AND (l.reserve_price IS NULL\n                  OR b.amount >= l.reserve_price))\nORDER BY l.id;",
+    "order_sensitive": true,
+    "features": [
+      "exists",
+      "correlated_subquery",
+      "nulls"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q08",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Find sellers who have at least one open listing and for whom every open listing has received a bid. Return seller_id and name, ordered by seller_id. Closed listings do not affect eligibility.",
+    "expected_sql": "SELECT u.id AS seller_id,\n       u.name\nFROM users u\nWHERE EXISTS\n        (SELECT 1\n         FROM listings l\n         WHERE l.seller_id = u.id\n             AND l.status = 'open')\n    AND NOT EXISTS\n        (SELECT 1\n         FROM listings l\n         WHERE l.seller_id = u.id\n             AND l.status = 'open'\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM bids b\n                  WHERE b.listing_id = l.id))\nORDER BY u.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "exists",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q09",
+    "category": "correlated_maximum",
+    "difficulty": "hard",
+    "question": "For every listing that has bids, return every bid tied for its highest amount. Return listing_id, title, bidder_id, bid_id, and amount, ordered by listing_id then bid_id. Include open and closed listings.",
+    "expected_sql": "SELECT l.id AS listing_id,\n       l.title,\n       b.bidder_id,\n       b.id AS bid_id,\n       b.amount\nFROM listings l\nJOIN bids b ON b.listing_id = l.id\nWHERE b.amount =\n        (SELECT MAX(b2.amount)\n         FROM bids b2\n         WHERE b2.listing_id = l.id)\nORDER BY l.id,\n         b.id;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "max",
+      "ties"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s16_q10",
+    "category": "self_join",
+    "difficulty": "hard",
+    "question": "Find unordered pairs of bidders who have both bid on at least two distinct open listings. Return smaller_bidder_id, larger_bidder_id, and shared_listing_count, ordered by those two IDs. Multiple bids by one bidder on one listing count only once.",
+    "expected_sql": "SELECT b1.bidder_id AS smaller_bidder_id,\n       b2.bidder_id AS larger_bidder_id,\n       COUNT(DISTINCT b1.listing_id) AS shared_listing_count\nFROM bids b1\nJOIN bids b2 ON b2.listing_id = b1.listing_id\nAND b1.bidder_id < b2.bidder_id\nJOIN listings l ON l.id = b1.listing_id\nWHERE l.status = 'open'\nGROUP BY b1.bidder_id,\n         b2.bidder_id\nHAVING COUNT(DISTINCT b1.listing_id) >= 2\nORDER BY b1.bidder_id,\n         b2.bidder_id;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "count_distinct",
+      "having",
+      "fanout"
+    ],
+    "schema_id": "s16_marketplace"
+  },
+  {
+    "id": "s17_q01",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List mandatory questions. Return question_id and prompt, ordered by question_id.",
+    "expected_sql": "SELECT id AS question_id,\n       prompt\nFROM questions\nWHERE required = 1\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q02",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List responses with a score of at least 4. Return response_id, participant_id, question_id, and score, ordered by response_id.",
+    "expected_sql": "SELECT id AS response_id,\n       participant_id,\n       question_id,\n       score\nFROM responses\nWHERE score >= 4\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "nulls"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q03",
+    "category": "null_grouping",
+    "difficulty": "easy",
+    "question": "Count registered participants by group, displaying NULL group names as Unassigned. Return group_name and participant_count, ordered by the displayed group_name.",
+    "expected_sql": "SELECT COALESCE(group_name, 'Unassigned') AS group_name,\n       COUNT(*) AS participant_count\nFROM participants\nGROUP BY COALESCE(group_name, 'Unassigned')\nORDER BY group_name;",
+    "order_sensitive": true,
+    "features": [
+      "coalesce",
+      "group_by"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q04",
+    "category": "left_join_aggregate",
+    "difficulty": "medium",
+    "question": "For every question, return question_id, prompt, answered_count, and average_score rounded to two decimals. Ignore NULL scores in both statistics; average_score must be NULL when nobody answered. Order by question_id.",
+    "expected_sql": "SELECT q.id AS question_id,\n       q.prompt,\n       COUNT(r.score) AS answered_count,\n       ROUND(AVG(r.score), 2) AS average_score\nFROM questions q\nLEFT JOIN responses r ON r.question_id = q.id\nGROUP BY q.id,\n         q.prompt\nORDER BY q.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count_nullable",
+      "avg",
+      "round"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q05",
+    "category": "set_difference",
+    "difficulty": "medium",
+    "question": "Which participants answered question 1 but did not answer question 2? A NULL score does not count as an answer. Return participant_id values ascending.",
+    "expected_sql": "SELECT participant_id\nFROM responses\nWHERE question_id = 1\n    AND score IS NOT NULL\nEXCEPT\nSELECT participant_id\nFROM responses\nWHERE question_id = 2\n    AND score IS NOT NULL\nORDER BY participant_id;",
+    "order_sensitive": true,
+    "features": [
+      "except",
+      "nulls",
+      "duplicate_elimination"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q06",
+    "category": "multiset_union",
+    "difficulty": "medium",
+    "question": "Combine the participant IDs of all non-NULL responses to question 1 with those of all non-NULL responses to question 2. Keep duplicates so a participant who answered both appears twice. Return only participant_id, sorted ascending.",
+    "expected_sql": "SELECT participant_id\nFROM responses\nWHERE question_id = 1\n    AND score IS NOT NULL\nUNION ALL\nSELECT participant_id\nFROM responses\nWHERE question_id = 2\n    AND score IS NOT NULL\nORDER BY participant_id;",
+    "order_sensitive": true,
+    "features": [
+      "union_all",
+      "duplicate_preservation"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q07",
+    "category": "zero_inclusion",
+    "difficulty": "medium",
+    "question": "For every registered participant, return participant_id, name, and answered_count (the number of questions answered with a non-NULL score), in that order. Include participants with zero answers. Sort by participant_id ascending.",
+    "expected_sql": "SELECT p.id AS participant_id,\n       p.name,\n       COUNT(r.score) AS answered_count\nFROM participants p\nLEFT JOIN responses r ON r.participant_id = p.id\nGROUP BY p.id,\n         p.name\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count_nullable",
+      "zero_inclusion"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q08",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Which participants answered every mandatory question with a non-NULL score? Return participant_id and name, ordered by participant_id. Optional questions do not affect eligibility. If there are no mandatory questions, every participant qualifies.",
+    "expected_sql": "SELECT p.id AS participant_id,\n       p.name\nFROM participants p\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM questions q\n         WHERE q.required = 1\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM responses r\n                  WHERE r.participant_id = p.id\n                      AND r.question_id = q.id\n                      AND r.score IS NOT NULL))\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q09",
+    "category": "set_equality",
+    "difficulty": "hard",
+    "question": "Find unordered participant pairs with exactly the same set of mandatory questions answered with non-NULL scores. Require that each participant answered at least one mandatory question. Return smaller_participant_id and larger_participant_id, ordered by both IDs.",
+    "expected_sql": "WITH answered AS\n    (SELECT r.participant_id,\n            r.question_id\n     FROM responses r\n     JOIN questions q ON q.id = r.question_id\n     WHERE q.required = 1\n         AND r.score IS NOT NULL)\nSELECT p1.id AS smaller_participant_id,\n       p2.id AS larger_participant_id\nFROM participants p1\nJOIN participants p2 ON p1.id < p2.id\nWHERE EXISTS\n        (SELECT 1\n         FROM answered a\n         WHERE a.participant_id = p1.id)\n    AND EXISTS\n        (SELECT 1\n         FROM answered a\n         WHERE a.participant_id = p2.id)\n    AND NOT EXISTS\n        (SELECT question_id\n         FROM answered\n         WHERE participant_id = p1.id\n         EXCEPT SELECT question_id\n         FROM answered\n         WHERE participant_id = p2.id)\n    AND NOT EXISTS\n        (SELECT question_id\n         FROM answered\n         WHERE participant_id = p2.id\n         EXCEPT SELECT question_id\n         FROM answered\n         WHERE participant_id = p1.id)\nORDER BY p1.id,\n         p2.id;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "except",
+      "set_equality",
+      "exists",
+      "not_exists"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s17_q10",
+    "category": "completion_ratio",
+    "difficulty": "hard",
+    "question": "For each registered participant group, compute the percentage of mandatory question-participant combinations that have a non-NULL score. The denominator is all registered participants in the group times the total number of mandatory questions; skips and missing responses are incomplete. Return group_name (Unassigned for NULL) and completion_percent rounded to two decimals, ordered by group_name. Use NULL if there are no mandatory questions.",
+    "expected_sql": "SELECT COALESCE(p.group_name, 'Unassigned') AS group_name,\n       ROUND(100.0 * SUM(\n                             (SELECT COUNT(*)\n                              FROM responses r\n                              JOIN questions q ON q.id = r.question_id\n                              WHERE r.participant_id = p.id\n                                  AND q.required = 1\n                                  AND r.score IS NOT NULL)) / NULLIF(COUNT(*) *\n                                                                         (SELECT COUNT(*)\n                                                                          FROM questions\n                                                                          WHERE required = 1), 0), 2) AS completion_percent\nFROM participants p\nGROUP BY COALESCE(p.group_name, 'Unassigned')\nORDER BY group_name;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "ratio",
+      "nullif",
+      "zero_inclusion"
+    ],
+    "schema_id": "s17_surveys"
+  },
+  {
+    "id": "s18_q01",
+    "category": "filter",
+    "difficulty": "easy",
+    "question": "List players on team 1. Return player_id, name, and position, ordered by player_id.",
+    "expected_sql": "SELECT id AS player_id,\n       name,\n       POSITION\nFROM players\nWHERE team_id = 1\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q02",
+    "category": "filter_null",
+    "difficulty": "easy",
+    "question": "List completed matches that ended in a draw. Return match_id, home_team_id, away_team_id, and the home score as goals_each, ordered by match_id.",
+    "expected_sql": "SELECT id AS match_id,\n       home_team_id,\n       away_team_id,\n       home_score AS goals_each\nFROM matches\nWHERE status = 'completed'\n    AND home_score = away_score\nORDER BY id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "column_comparison"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q03",
+    "category": "zero_inclusion",
+    "difficulty": "easy",
+    "question": "For every team, count players in its current roster. Return team_id, name, and player_count, ordered by team_id. Include teams with zero players.",
+    "expected_sql": "SELECT t.id AS team_id,\n       t.name,\n       COUNT(p.id) AS player_count\nFROM teams t\nLEFT JOIN players p ON p.team_id = t.id\nGROUP BY t.id,\n         t.name\nORDER BY t.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "count",
+      "zero_inclusion"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q04",
+    "category": "left_join_aggregate",
+    "difficulty": "medium",
+    "question": "For every player, sum goals from their recorded appearances in completed matches only. Return player_id, name, and recorded_goals, using 0 if none. Order by recorded_goals descending, then player_id.",
+    "expected_sql": "SELECT p.id AS player_id,\n       p.name,\n       COALESCE(SUM(CASE\n                        WHEN m.status = 'completed' THEN a.goals\n                        ELSE 0\n                    END), 0) AS recorded_goals\nFROM players p\nLEFT JOIN appearances a ON a.player_id = p.id\nLEFT JOIN matches m ON m.id = a.match_id\nGROUP BY p.id,\n         p.name\nORDER BY recorded_goals DESC,\n         p.id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_aggregation",
+      "coalesce"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q05",
+    "category": "set_union",
+    "difficulty": "medium",
+    "question": "List distinct team_id values for teams that have played in at least one completed match, whether at home or away. Order by team_id.",
+    "expected_sql": "SELECT home_team_id AS team_id\nFROM matches\nWHERE status = 'completed'\nUNION\nSELECT away_team_id AS team_id\nFROM matches\nWHERE status = 'completed'\nORDER BY team_id;",
+    "order_sensitive": true,
+    "features": [
+      "union",
+      "duplicate_elimination"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q06",
+    "category": "set_intersection",
+    "difficulty": "medium",
+    "question": "Which teams have won at least one completed home match and at least one completed away match? Return distinct team_id values ascending.",
+    "expected_sql": "SELECT home_team_id AS team_id\nFROM matches\nWHERE status = 'completed'\n    AND home_score > away_score INTERSECT\nSELECT away_team_id AS team_id\nFROM matches\nWHERE status = 'completed'\n    AND away_score > home_score\nORDER BY team_id;",
+    "order_sensitive": true,
+    "features": [
+      "intersect",
+      "column_comparison"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q07",
+    "category": "league_points",
+    "difficulty": "medium",
+    "question": "Compute league points for every team from completed matches: 3 per win, 1 per draw, 0 per loss. Return team_id, name, and points, including 0 for teams without completed matches. Order by points descending, then team_id.",
+    "expected_sql": "WITH earned AS\n    (SELECT home_team_id AS team_id,\n            CASE\n                WHEN home_score > away_score THEN 3\n                WHEN home_score = away_score THEN 1\n                ELSE 0\n            END AS points\n     FROM matches\n     WHERE status = 'completed'\n     UNION ALL SELECT away_team_id AS team_id,\n                      CASE\n                          WHEN away_score > home_score THEN 3\n                          WHEN away_score = home_score THEN 1\n                          ELSE 0\n                      END AS points\n     FROM matches\n     WHERE status = 'completed')\nSELECT t.id AS team_id,\n       t.name,\n       COALESCE(SUM(e.points), 0) AS points\nFROM teams t\nLEFT JOIN earned e ON e.team_id = t.id\nGROUP BY t.id,\n         t.name\nORDER BY points DESC,\n         t.id;",
+    "order_sensitive": true,
+    "features": [
+      "union_all",
+      "case",
+      "left_join",
+      "zero_inclusion"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q08",
+    "category": "anti_join",
+    "difficulty": "hard",
+    "question": "Find teams with at least one completed match and no completed losses. Return team_id and name, ordered by team_id. Ignore scheduled matches.",
+    "expected_sql": "SELECT t.id AS team_id,\n       t.name\nFROM teams t\nWHERE EXISTS\n        (SELECT 1\n         FROM matches m\n         WHERE m.status = 'completed'\n             AND (m.home_team_id = t.id\n                  OR m.away_team_id = t.id))\n    AND NOT EXISTS\n        (SELECT 1\n         FROM matches m\n         WHERE m.status = 'completed'\n             AND ((m.home_team_id = t.id\n                   AND m.home_score < m.away_score)\n                  OR (m.away_team_id = t.id\n                      AND m.away_score < m.home_score)))\nORDER BY t.id;",
+    "order_sensitive": true,
+    "features": [
+      "exists",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q09",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Find players with a recorded appearance in every completed match involving their current team. Require that the team has at least one completed match. Return player_id and name, ordered by player_id. A missing appearance does not count as participation.",
+    "expected_sql": "SELECT p.id AS player_id,\n       p.name\nFROM players p\nWHERE EXISTS\n        (SELECT 1\n         FROM matches m\n         WHERE m.status = 'completed'\n             AND (m.home_team_id = p.team_id\n                  OR m.away_team_id = p.team_id))\n    AND NOT EXISTS\n        (SELECT 1\n         FROM matches m\n         WHERE m.status = 'completed'\n             AND (m.home_team_id = p.team_id\n                  OR m.away_team_id = p.team_id)\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM appearances a\n                  WHERE a.match_id = m.id\n                      AND a.player_id = p.id))\nORDER BY p.id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "exists",
+      "not_exists"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s18_q10",
+    "category": "nested_ranking",
+    "difficulty": "hard",
+    "question": "For each team that has won a completed match, identify the strongest opponent it defeated. Strength is that opponent's total league points from all completed matches (3 for a win, 1 for a draw, 0 for a loss). Choose the lowest opponent ID if points tie. Return team_id, opponent_id, and opponent_points, ordered by team_id. Count an opponent once even if defeated repeatedly.",
+    "expected_sql": "WITH outcomes AS\n    (SELECT home_team_id AS team_id,\n            away_team_id AS opponent_id,\n            CASE\n                WHEN home_score > away_score THEN 3\n                WHEN home_score = away_score THEN 1\n                ELSE 0\n            END AS points\n     FROM matches\n     WHERE status = 'completed'\n     UNION ALL SELECT away_team_id,\n                      home_team_id,\n                      CASE\n                          WHEN away_score > home_score THEN 3\n                          WHEN away_score = home_score THEN 1\n                          ELSE 0\n                      END\n     FROM matches\n     WHERE status = 'completed'),\n     standings AS\n    (SELECT team_id,\n            SUM(points) AS points\n     FROM outcomes\n     GROUP BY team_id),\n     defeated AS\n    (SELECT DISTINCT o.team_id,\n                     o.opponent_id,\n                     s.points AS opponent_points\n     FROM outcomes o\n     JOIN standings s ON s.team_id = o.opponent_id\n     WHERE o.points = 3)\nSELECT d.team_id,\n       d.opponent_id,\n       d.opponent_points\nFROM defeated d\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM defeated d2\n         WHERE d2.team_id = d.team_id\n             AND (d2.opponent_points > d.opponent_points\n                  OR (d2.opponent_points = d.opponent_points\n                      AND d2.opponent_id < d.opponent_id)))\nORDER BY d.team_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "nested_aggregation",
+      "not_exists",
+      "correlated_subquery",
+      "ties",
+      "union_all"
+    ],
+    "schema_id": "s18_sports"
+  },
+  {
+    "id": "s19_q01",
+    "category": "filtering",
+    "difficulty": "easy",
+    "question": "List completed runs. Return run_id, experiment_id, and variant, in that order, sorted by run_id ascending.",
+    "expected_sql": "SELECT id AS run_id,\n       experiment_id, variant\nFROM runs\nWHERE status = 'completed'\nORDER BY run_id;",
+    "order_sensitive": true,
+    "features": [
+      "filter",
+      "order_by"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q02",
+    "category": "null_handling",
+    "difficulty": "easy",
+    "question": "List stored measurements whose reading is NULL. Return measurement_id, run_id, and metric, in that order, sorted by measurement_id ascending. Include all run statuses.",
+    "expected_sql": "SELECT id AS measurement_id,\n       run_id,\n       metric\nFROM measurements\nWHERE value IS NULL\nORDER BY measurement_id;",
+    "order_sensitive": true,
+    "features": [
+      "is_null",
+      "filter"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q03",
+    "category": "anti_join",
+    "difficulty": "easy",
+    "question": "Which defined metrics have never had a measurement row recorded, including rows with NULL readings? Return metric and unit, in that order, sorted by metric ascending. Include all runs.",
+    "expected_sql": "SELECT m.name AS metric,\n       m.unit\nFROM metrics AS m\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM measurements AS x\n         WHERE x.metric = m.name)\nORDER BY metric;",
+    "order_sensitive": true,
+    "features": [
+      "not_exists",
+      "anti_join"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q04",
+    "category": "conditional_aggregation",
+    "difficulty": "medium",
+    "question": "For every experiment, return experiment_id, name, run_count, completed_runs, and failed_runs, in that order. Include experiments without runs with zero counts; running runs count only toward run_count. Sort by experiment_id ascending.",
+    "expected_sql": "SELECT e.id AS experiment_id,\n       e.name,\n       COUNT(r.id) AS run_count,\n       SUM(CASE\n               WHEN r.status = 'completed' THEN 1\n               ELSE 0\n           END) AS completed_runs,\n       SUM(CASE\n               WHEN r.status = 'failed' THEN 1\n               ELSE 0\n           END) AS failed_runs\nFROM experiments AS e\nLEFT JOIN runs AS r ON r.experiment_id = e.id\nGROUP BY e.id,\n         e.name\nORDER BY experiment_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_aggregation",
+      "zero_matches"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q05",
+    "category": "set_difference",
+    "difficulty": "medium",
+    "question": "Find runs with at least one non-NULL temperature reading but no non-NULL pressure reading. Include every run status. Return distinct run_id values sorted ascending.",
+    "expected_sql": "SELECT run_id\nFROM measurements\nWHERE metric = 'temperature'\n    AND value IS NOT NULL\nEXCEPT\nSELECT run_id\nFROM measurements\nWHERE metric = 'pressure'\n    AND value IS NOT NULL\nORDER BY run_id;",
+    "order_sensitive": true,
+    "features": [
+      "except",
+      "set_difference",
+      "nulls"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q06",
+    "category": "duplicate_preserving_union",
+    "difficulty": "medium",
+    "question": "Combine all non-NULL temperature readings from run 1 with all non-NULL temperature readings from run 2, keeping repeated readings even when values match. Return one column named value, sorted ascending.",
+    "expected_sql": "SELECT value\nFROM measurements\nWHERE run_id = 1\n    AND metric = 'temperature'\n    AND value IS NOT NULL\nUNION ALL\nSELECT value\nFROM measurements\nWHERE run_id = 2\n    AND metric = 'temperature'\n    AND value IS NOT NULL\nORDER BY value;",
+    "order_sensitive": true,
+    "features": [
+      "union_all",
+      "duplicates"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q07",
+    "category": "coverage_ratio",
+    "difficulty": "medium",
+    "question": "For every run, return run_id and target_coverage_percent, in that order, sorted by run_id. Coverage is 100 times the number of distinct target metrics with at least one non-NULL reading for that run divided by the number of defined metrics with non-NULL targets. Include all statuses and runs without readings, use zero coverage when no target is measured, return NULL if there are no target metrics, and round percentages to two decimals.",
+    "expected_sql": "SELECT r.id AS run_id,\n       ROUND(100.0 *\n                 (SELECT COUNT(DISTINCT x.metric)\n                  FROM measurements AS x\n                  JOIN metrics AS m ON m.name = x.metric\n                  WHERE x.run_id = r.id\n                      AND x.value IS NOT NULL\n                      AND m.target IS NOT NULL) / NULLIF(\n                                                             (SELECT COUNT(*)\n                                                              FROM metrics\n                                                              WHERE target IS NOT NULL), 0), 2) AS target_coverage_percent\nFROM runs AS r\nORDER BY run_id;",
+    "order_sensitive": true,
+    "features": [
+      "correlated_subquery",
+      "count_distinct",
+      "ratio",
+      "nullif",
+      "zero_matches"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q08",
+    "category": "relational_division",
+    "difficulty": "hard",
+    "question": "Find completed runs that have at least one non-NULL reading for every defined metric whose target is non-NULL. If there are no target metrics, all completed runs qualify. Return run_id and experiment_id, in that order, sorted by run_id ascending.",
+    "expected_sql": "SELECT r.id AS run_id,\n       r.experiment_id\nFROM runs AS r\nWHERE r.status = 'completed'\n    AND NOT EXISTS\n        (SELECT 1\n         FROM metrics AS m\n         WHERE m.target IS NOT NULL\n             AND NOT EXISTS\n                 (SELECT 1\n                  FROM measurements AS x\n                  WHERE x.run_id = r.id\n                      AND x.metric = m.name\n                      AND x.value IS NOT NULL))\nORDER BY run_id;",
+    "order_sensitive": true,
+    "features": [
+      "relational_division",
+      "not_exists",
+      "correlated_subquery"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q09",
+    "category": "nested_aggregation",
+    "difficulty": "hard",
+    "question": "Compare treatment and control yield for each experiment using completed runs only. First average non-NULL yield readings within each run, then average those run means within each variant so runs have equal weight. Ignore runs with no known yield and include only experiments with a known mean for both variants. Return experiment_id, control_mean, treatment_mean, and percent_change, in that order. Percent change is 100 times (treatment minus control) divided by control; return NULL when control is zero. Round all three calculated values to two decimals and sort by experiment_id.",
+    "expected_sql": "WITH run_means AS\n    (SELECT r.id AS run_id,\n            r.experiment_id,\n            r.variant,\n            AVG(x.value) AS mean_yield\n     FROM runs AS r\n     JOIN measurements AS x ON x.run_id = r.id\n     WHERE r.status = 'completed'\n         AND x.metric = 'yield'\n         AND x.value IS NOT NULL\n     GROUP BY r.id,\n              r.experiment_id,\n              r.variant),\n     experiment_means AS\n    (SELECT experiment_id,\n            AVG(CASE\n                    WHEN variant = 'control' THEN mean_yield\n                END) AS control_mean,\n            AVG(CASE\n                    WHEN variant = 'treatment' THEN mean_yield\n                END) AS treatment_mean\n     FROM run_means\n     GROUP BY experiment_id)\nSELECT experiment_id,\n       ROUND(control_mean, 2) AS control_mean,\n       ROUND(treatment_mean, 2) AS treatment_mean,\n       ROUND(100.0 * (treatment_mean - control_mean) / NULLIF(control_mean, 0), 2) AS percent_change\nFROM experiment_means\nWHERE control_mean IS NOT NULL\n    AND treatment_mean IS NOT NULL\nORDER BY experiment_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "nested_aggregation",
+      "conditional_aggregation",
+      "ratio",
+      "nullif"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s19_q10",
+    "category": "correlated_extremum",
+    "difficulty": "hard",
+    "question": "For each metric with a non-NULL target, find the completed runs whose mean non-NULL reading is closest to that target. Average repeated readings within a run, omit runs without a known reading, compare absolute distances before rounding, and keep all tied runs. Return metric, run_id, mean_value, and distance, in that order. Round mean_value and distance to two decimals and sort by metric ascending, then run_id ascending.",
+    "expected_sql": "WITH run_means AS\n    (SELECT m.name AS metric,\n            r.id AS run_id,\n            AVG(x.value) AS mean_value,\n            ABS(AVG(x.value) - m.target) AS distance\n     FROM metrics AS m\n     JOIN measurements AS x ON x.metric = m.name\n     JOIN runs AS r ON r.id = x.run_id\n     WHERE m.target IS NOT NULL\n         AND x.value IS NOT NULL\n         AND r.status = 'completed'\n     GROUP BY m.name,\n              m.target,\n              r.id)\nSELECT a.metric,\n       a.run_id,\n       ROUND(a.mean_value, 2) AS mean_value,\n       ROUND(a.distance, 2) AS distance\nFROM run_means AS a\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM run_means AS b\n         WHERE b.metric = a.metric\n             AND b.distance < a.distance)\nORDER BY a.metric,\n         a.run_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "nested_aggregation",
+      "not_exists",
+      "correlated_subquery",
+      "ties",
+      "absolute_difference"
+    ],
+    "schema_id": "s19_experiments"
+  },
+  {
+    "id": "s20_q01",
+    "category": "null_filter",
+    "difficulty": "easy",
+    "question": "List tasks with no assignee, including every status. Return task_id, project_id, title, and due_date, in that order, keeping NULL due dates. Sort by task_id ascending.",
+    "expected_sql": "SELECT id AS task_id,\n       project_id,\n       title,\n       due_date\nFROM tasks\nWHERE assignee_id IS NULL\nORDER BY task_id;",
+    "order_sensitive": true,
+    "features": [
+      "is_null",
+      "filter"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q02",
+    "category": "zero_preserving_aggregation",
+    "difficulty": "easy",
+    "question": "For every person, total the hours they personally logged across all tasks and dates, regardless of task status or assignment. Return person_id, name, and total_hours, in that order; use zero for people with no entries, round hours to two decimals, and sort by person_id ascending.",
+    "expected_sql": "SELECT p.id AS person_id,\n       p.name,\n       ROUND(COALESCE(SUM(e.hours), 0), 2) AS total_hours\nFROM people AS p\nLEFT JOIN time_entries AS e ON e.person_id = p.id\nGROUP BY p.id,\n         p.name\nORDER BY person_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "aggregation",
+      "coalesce",
+      "zero_matches"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q03",
+    "category": "null_filter",
+    "difficulty": "easy",
+    "question": "List tasks with no due date, regardless of status. Return task_id, title, and status, in that order, sorted by task_id ascending.",
+    "expected_sql": "SELECT id AS task_id,\n       title,\n       status\nFROM tasks\nWHERE due_date IS NULL\nORDER BY task_id;",
+    "order_sensitive": true,
+    "features": [
+      "is_null",
+      "filter"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q04",
+    "category": "conditional_aggregation",
+    "difficulty": "medium",
+    "question": "For every project, return project_id, name, known_cost, and unpriced_hours, in that order. Include all task statuses and dates. Known cost is the sum of hours times billed_rate for entries with a non-NULL rate; unpriced hours are hours with a NULL rate. Use zero for missing totals and projects with no work, round both totals to two decimals, and sort by project_id ascending.",
+    "expected_sql": "SELECT p.id AS project_id,\n       p.name,\n       ROUND(COALESCE(SUM(e.hours * e.billed_rate), 0), 2) AS known_cost,\n       ROUND(COALESCE(SUM(CASE\n                              WHEN e.billed_rate IS NULL THEN e.hours\n                              ELSE 0\n                          END), 0), 2) AS unpriced_hours\nFROM projects AS p\nLEFT JOIN tasks AS t ON t.project_id = p.id\nLEFT JOIN time_entries AS e ON e.task_id = t.id\nGROUP BY p.id,\n         p.name\nORDER BY project_id;",
+    "order_sensitive": true,
+    "features": [
+      "left_join",
+      "conditional_aggregation",
+      "nulls",
+      "zero_matches"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q05",
+    "category": "prerequisite_readiness",
+    "difficulty": "medium",
+    "question": "Find tasks whose own status is not done and whose direct prerequisites are all done. Tasks without prerequisites qualify. Return task_id and title, in that order, sorted by task_id ascending. Consider only direct prerequisites, regardless of the task due date or assignee.",
+    "expected_sql": "SELECT t.id AS task_id,\n       t.title\nFROM tasks AS t\nWHERE t.status <> 'done'\n    AND NOT EXISTS\n        (SELECT 1\n         FROM dependencies AS d\n         JOIN tasks AS prerequisite ON prerequisite.id = d.depends_on\n         WHERE d.task_id = t.id\n             AND prerequisite.status <> 'done')\nORDER BY task_id;",
+    "order_sensitive": true,
+    "features": [
+      "not_exists",
+      "relational_division",
+      "correlated_subquery"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q06",
+    "category": "self_join",
+    "difficulty": "medium",
+    "question": "Find direct dependency edges for which the dependent task and its prerequisite have the same non-NULL assignee, regardless of task status. Return task_id, depends_on, and assignee_id, in that order. Sort by task_id ascending, then depends_on ascending.",
+    "expected_sql": "SELECT d.task_id,\n       d.depends_on,\n       dependent.assignee_id\nFROM dependencies AS d\nJOIN tasks AS dependent ON dependent.id = d.task_id\nJOIN tasks AS prerequisite ON prerequisite.id = d.depends_on\nWHERE dependent.assignee_id = prerequisite.assignee_id\nORDER BY d.task_id,\n         d.depends_on;",
+    "order_sensitive": true,
+    "features": [
+      "self_join",
+      "nulls",
+      "join"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q07",
+    "category": "existence_and_exclusion",
+    "difficulty": "medium",
+    "question": "Which projects contain at least one task but no task with status blocked? Return project_id and name, in that order, sorted by project_id ascending. Projects with no tasks must be excluded.",
+    "expected_sql": "SELECT p.id AS project_id,\n       p.name\nFROM projects AS p\nWHERE EXISTS\n        (SELECT 1\n         FROM tasks AS t\n         WHERE t.project_id = p.id)\n    AND NOT EXISTS\n        (SELECT 1\n         FROM tasks AS t\n         WHERE t.project_id = p.id\n             AND t.status = 'blocked')\nORDER BY project_id;",
+    "order_sensitive": true,
+    "features": [
+      "exists",
+      "not_exists",
+      "anti_join",
+      "correlated_subquery"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q08",
+    "category": "recursive_dependencies",
+    "difficulty": "hard",
+    "question": "List every direct or indirect prerequisite of task 5. Follow dependency edges recursively, return each prerequisite only once even if reachable through multiple paths, and exclude task 5 itself. Return task_id and title, in that order, sorted by task_id ascending; include prerequisites of any status.",
+    "expected_sql": "WITH RECURSIVE prerequisites(task_id) AS\n    (SELECT depends_on\n     FROM dependencies\n     WHERE task_id = 5\n     UNION SELECT d.depends_on\n     FROM dependencies AS d\n     JOIN prerequisites AS p ON d.task_id = p.task_id)\nSELECT t.id AS task_id,\n       t.title\nFROM prerequisites AS p\nJOIN tasks AS t ON t.id = p.task_id\nWHERE t.id <> 5\nORDER BY task_id;",
+    "order_sensitive": true,
+    "features": [
+      "recursive_cte",
+      "union",
+      "deduplication",
+      "transitive_closure"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q09",
+    "category": "groupwise_maximum",
+    "difficulty": "hard",
+    "question": "Find the task with the greatest known cost within each project, keeping all tied tasks and omitting projects with no tasks. Include every task status and date. A task known cost is the sum of hours times non-NULL billed_rate, or zero when it has no priced entries. Compare unrounded costs. Return project_id, task_id, title, and known_cost, in that order, round known_cost to two decimals, and sort by project_id then task_id ascending.",
+    "expected_sql": "WITH task_costs AS\n    (SELECT t.project_id,\n            t.id AS task_id,\n            t.title,\n            COALESCE(SUM(e.hours * e.billed_rate), 0) AS known_cost\n     FROM tasks AS t\n     LEFT JOIN time_entries AS e ON e.task_id = t.id\n     GROUP BY t.project_id,\n              t.id,\n              t.title)\nSELECT a.project_id,\n       a.task_id,\n       a.title,\n       ROUND(a.known_cost, 2) AS known_cost\nFROM task_costs AS a\nWHERE NOT EXISTS\n        (SELECT 1\n         FROM task_costs AS b\n         WHERE b.project_id = a.project_id\n             AND b.known_cost > a.known_cost)\nORDER BY a.project_id,\n         a.task_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "correlated_subquery",
+      "not_exists",
+      "groupwise_maximum",
+      "ties",
+      "zero_matches"
+    ],
+    "schema_id": "s20_projects"
+  },
+  {
+    "id": "s20_q10",
+    "category": "aggregation_grain",
+    "difficulty": "hard",
+    "question": "For every project, return project_id, task_count, dependency_edge_count, and total_hours, in that order. Count each task once, count each direct dependency edge once for the project owning its dependent task, and sum each time entry once. Include all statuses and dates, preserve projects without tasks with zero totals, round hours to two decimals, and sort by project_id ascending.",
+    "expected_sql": "WITH task_totals AS\n    (SELECT project_id,\n            COUNT(*) AS task_count\n     FROM tasks\n     GROUP BY project_id),\n     dependency_totals AS\n    (SELECT t.project_id,\n            COUNT(*) AS dependency_edge_count\n     FROM tasks AS t\n     JOIN dependencies AS d ON d.task_id = t.id\n     GROUP BY t.project_id),\n     time_totals AS\n    (SELECT t.project_id,\n            SUM(e.hours) AS total_hours\n     FROM tasks AS t\n     JOIN time_entries AS e ON e.task_id = t.id\n     GROUP BY t.project_id)\nSELECT p.id AS project_id,\n       COALESCE(t.task_count, 0) AS task_count,\n       COALESCE(d.dependency_edge_count, 0) AS dependency_edge_count,\n       ROUND(COALESCE(h.total_hours, 0), 2) AS total_hours\nFROM projects AS p\nLEFT JOIN task_totals AS t ON t.project_id = p.id\nLEFT JOIN dependency_totals AS d ON d.project_id = p.id\nLEFT JOIN time_totals AS h ON h.project_id = p.id\nORDER BY project_id;",
+    "order_sensitive": true,
+    "features": [
+      "cte",
+      "multiple_aggregation_grains",
+      "fanout_safe",
+      "left_join",
+      "zero_matches"
+    ],
+    "schema_id": "s20_projects"
+  }
+]

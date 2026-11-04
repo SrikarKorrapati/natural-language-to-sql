@@ -1,0 +1,200 @@
+{"id": "s01_q01", "columns": ["id", "name", "price"], "rows": [[1, "Keyboard", 90.0], [4, "Headphones", 120.0]]}
+{"id": "s01_q02", "columns": ["status", "order_count"], "rows": [["cancelled", 2], ["completed", 6], ["pending", 1]]}
+{"id": "s01_q03", "columns": ["region"], "rows": [["East"], ["North"], ["South"], ["West"]]}
+{"id": "s01_q04", "columns": ["id", "name", "revenue"], "rows": [[1, "Avery", 230.0], [2, "Jordan", 26.0], [3, "Morgan", 86.0], [4, "Riley", 172.0], [5, "Sam", 0.0], [6, "Casey", 0.0], [7, "Alex", 0.0], [8, "Taylor", 0.0], [9, "Drew", 0.0], [10, "Cameron", 0.0], [11, "Quinn", 0.0], [12, "Robin", 0.0], [13, "Jamie", 0.0]]}
+{"id": "s01_q05", "columns": ["id", "name", "units"], "rows": [[3, "Mug", 5], [5, "Notebook", 4], [2, "Lamp", 3]]}
+{"id": "s01_q06", "columns": ["id", "order_total"], "rows": [[1, 120.0], [4, 110.0], [6, 172.0]]}
+{"id": "s01_q07", "columns": ["id", "name"], "rows": [[1, "Avery"], [2, "Jordan"]]}
+{"id": "s01_q08", "columns": ["MONTH", "revenue", "growth_pct"], "rows": [["2024-12", 0.0, null], ["2025-01", 146.0, null], ["2025-02", 110.0, -24.66], ["2025-03", 258.0, 134.55]]}
+{"id": "s01_q09", "columns": ["category", "id", "name", "revenue"], "rows": [["Electronics", 1, "Keyboard", 160.0], ["Electronics", 4, "Headphones", 160.0], ["Home", 2, "Lamp", 120.0], ["Stationery", 5, "Notebook", 24.0]]}
+{"id": "s01_q10", "columns": ["id", "name"], "rows": [[1, "Avery"]]}
+{"id": "s02_q01", "columns": ["id", "name"], "rows": [[2, "Ben"], [3, "Cy"], [4, "Dee"], [8, "Hope"]]}
+{"id": "s02_q02", "columns": ["id", "name", "average_salary"], "rows": [[1, "Engineering", 98000.0], [2, "Sales", 85000.0], [3, "Operations", 80000.0], [4, "Legal", null]]}
+{"id": "s02_q03", "columns": ["title"], "rows": [["Analyst"], ["Consultant"], ["Director"], ["Engineer"], ["Manager"]]}
+{"id": "s02_q04", "columns": ["id", "name", "manager_name"], "rows": [[1, "Ada", null], [2, "Ben", "Ada"], [3, "Cy", "Ada"], [4, "Dee", "Ada"], [5, "Eli", "Ben"], [6, "Fay", "Ben"], [7, "Gus", "Eli"], [8, "Hope", "Cy"], [9, "Ira", "Ada"], [10, "Jo", "Dee"]]}
+{"id": "s02_q05", "columns": ["id", "name", "department_id", "salary"], "rows": [[1, "Ada", 1, 150000.0], [2, "Ben", 1, 100000.0], [3, "Cy", 2, 95000.0], [4, "Dee", 3, 90000.0], [6, "Fay", 1, 100000.0]]}
+{"id": "s02_q06", "columns": ["id", "name", "hours"], "rows": [[1, "Engineering", 27.0], [2, "Sales", 8.0], [3, "Operations", 0], [4, "Legal", 0]]}
+{"id": "s02_q07", "columns": ["id", "name"], "rows": [[1, "Ada"], [3, "Cy"], [4, "Dee"], [7, "Gus"], [10, "Jo"]]}
+{"id": "s02_q08", "columns": ["id", "name", "distance"], "rows": [[5, "Eli", 1], [2, "Ben", 2], [1, "Ada", 3]]}
+{"id": "s02_q09", "columns": ["department_id", "id", "name", "salary", "salary_rank"], "rows": [[1, 1, "Ada", 150000.0, 1], [1, 2, "Ben", 100000.0, 2], [1, 6, "Fay", 100000.0, 2], [2, 3, "Cy", 95000.0, 1], [2, 8, "Hope", 75000.0, 2], [3, 4, "Dee", 90000.0, 1], [3, 10, "Jo", 70000.0, 2]]}
+{"id": "s02_q10", "columns": ["department_id", "id", "name", "hours", "percentage"], "rows": [[1, 1, "Ada", 0, 0.0], [1, 2, "Ben", 6.0, 18.75], [1, 5, "Eli", 14.0, 43.75], [1, 6, "Fay", 7.0, 21.88], [1, 7, "Gus", 5.0, 15.63], [2, 3, "Cy", 6.0, 42.86], [2, 8, "Hope", 8.0, 57.14], [3, 4, "Dee", 0, 0], [3, 10, "Jo", 0, 0]]}
+{"id": "s03_q01", "columns": ["id", "name"], "rows": [[1, "Alma"], [3, "Cora"], [4, "Dane"]]}
+{"id": "s03_q02", "columns": ["id", "title", "credits"], "rows": [[2, "Algorithms", 3], [5, "Statistics", 3]]}
+{"id": "s03_q03", "columns": ["status", "enrollment_count"], "rows": [["completed", 8], ["enrolled", 3], ["withdrawn", 3]]}
+{"id": "s03_q04", "columns": ["id", "name", "weighted_score"], "rows": [[1, "Alma", 85.71], [2, "Bert", 77.5], [3, "Cora", 87.86], [4, "Dane", null], [5, "Esme", 80.0], [6, "Finn", 85.0], [7, "Gia", null]]}
+{"id": "s03_q05", "columns": ["id", "title", "enrollment_count"], "rows": [[1, "Databases", 1], [2, "Algorithms", 1], [3, "Networks", 2], [4, "Calculus", 0], [5, "Statistics", 1], [6, "Ancient History", 0], [7, "Topology", 0]]}
+{"id": "s03_q06", "columns": ["id", "name"], "rows": [[4, "Dane"], [7, "Gia"]]}
+{"id": "s03_q07", "columns": ["id", "name", "course_count", "credits"], "rows": [[1, "Inez", 2, 7], [2, "Jules", 1, 2], [3, "Kiran", 2, 7], [4, "Luz", 0, 0]]}
+{"id": "s03_q08", "columns": ["id", "name"], "rows": [[1, "Alma"], [3, "Cora"]]}
+{"id": "s03_q09", "columns": ["term", "id", "title", "average_score"], "rows": [["2024-Fall", 4, "Calculus", 90.0], ["2025-Spring", 1, "Databases", 85.0], ["2025-Spring", 2, "Algorithms", 85.0], ["2025-Spring", 5, "Statistics", 85.0]]}
+{"id": "s03_q10", "columns": ["cohort_count", "retained_count", "retention_pct"], "rows": [[5, 3, 60.0]]}
+{"id": "s04_q01", "columns": ["id", "title", "published_year"], "rows": [[5, "Open Sky", 2024], [4, "Quiet Maps", 2022], [2, "Glass River", 2020], [1, "Cloud Atlas", 2018], [3, "Night Orchard", 2018]]}
+{"id": "s04_q02", "columns": ["id", "book_id"], "rows": [[3, 3], [4, 1], [5, 2]]}
+{"id": "s04_q03", "columns": ["id", "name", "title_count"], "rows": [[1, "Mira Stone", 2], [2, "Noah Vale", 2], [3, "Opal Reed", 1], [4, "Pia Lake", 0]]}
+{"id": "s04_q04", "columns": ["id", "name", "title", "days_overdue"], "rows": [[3, "Bea", "Night Orchard", 15], [4, "Bea", "Cloud Atlas", 6]]}
+{"id": "s04_q05", "columns": ["id", "name", "returned_count", "average_days"], "rows": [[1, "Arun", 3, 10.0], [2, "Bea", 1, 22.0], [3, "Cole", 1, 2.0], [4, "Dina", 0, null], [5, "Enzo", 1, 14.0], [6, "Fia", 0, null], [7, "Gio", 0, null]]}
+{"id": "s04_q06", "columns": ["id", "title", "loan_count"], "rows": [[1, "Cloud Atlas", 3], [3, "Night Orchard", 3]]}
+{"id": "s04_q07", "columns": ["id", "name"], "rows": [[1, "Arun"], [2, "Bea"], [3, "Cole"]]}
+{"id": "s04_q08", "columns": ["member_id", "id", "loaned_at", "gap_days"], "rows": [[1, 1, "2025-05-01", null], [1, 2, "2025-05-20", 19], [1, 6, "2025-06-20", 31], [2, 3, "2025-06-01", null], [2, 4, "2025-06-10", 9], [3, 5, "2025-06-20", null], [3, 8, "2025-06-20", 0], [4, 7, "2025-07-01", null], [5, 9, "2025-05-01", null], [6, 10, "2025-07-02", null]]}
+{"id": "s04_q09", "columns": ["id", "title", "available_copies"], "rows": [[1, "Cloud Atlas", 2], [2, "Glass River", 1], [3, "Night Orchard", 1], [4, "Quiet Maps", 1], [5, "Open Sky", 1]]}
+{"id": "s04_q10", "columns": ["id", "name"], "rows": [[1, "Arun"]]}
+{"id": "s05_q01", "columns": ["id", "weight_kg"], "rows": [[3, 5.0], [4, 8.0]]}
+{"id": "s05_q02", "columns": ["id", "name", "shipment_count"], "rows": [[1, "Airway", 3], [2, "Roadline", 2], [3, "Seaway", 1], [4, "Railway", 0], [5, "Local", 1]]}
+{"id": "s05_q03", "columns": ["event_label"], "rows": [["CANCELLED"], ["DELAYED"], ["DELIVERED"], ["IN TRANSIT"], ["PICKED UP"]]}
+{"id": "s05_q04", "columns": ["id", "name", "hours_late"], "rows": [[2, "Acorn", 12.0], [7, "Acorn", 24.0]]}
+{"id": "s05_q05", "columns": ["id", "name", "cost_per_kg"], "rows": [[1, "Airway", 4.0], [2, "Roadline", 2.0], [3, "Seaway", 2.0], [4, "Railway", null], [5, "Local", null]]}
+{"id": "s05_q06", "columns": ["id", "name", "carrier_count"], "rows": [[1, "Acorn", 2]]}
+{"id": "s05_q07", "columns": ["id", "name"], "rows": [[4, "Cedar"], [8, "Dogwood"]]}
+{"id": "s05_q08", "columns": ["id", "event_type", "occurred_at"], "rows": [[1, "delivered", "2025-05-03 12:00:00"], [2, "delivered", "2025-05-04 06:00:00"], [3, "delayed", "2025-05-03 10:00:00"], [4, null, null], [5, "cancelled", "2025-05-02 11:00:00"], [6, "delivered", "2025-05-07 18:00:00"], [7, "delivered", "2025-05-06 18:00:00"], [8, null, null]]}
+{"id": "s05_q09", "columns": ["shipment_id", "hours_elapsed"], "rows": [[1, 50.0], [2, 68.0], [6, 106.0], [7, 81.0]]}
+{"id": "s05_q10", "columns": ["carrier_id", "shipped_date", "daily_weight", "cumulative_weight"], "rows": [[1, "2025-05-01", 10.0, 10.0], [1, "2025-05-02", 5.0, 15.0], [1, "2025-05-03", 10.0, 25.0], [2, "2025-05-01", 20.0, 20.0], [3, "2025-05-03", 50.0, 50.0], [5, "2025-05-04", 0.0, 0.0]]}
+{"id": "s06_q01", "columns": ["patient_id", "name", "city"], "rows": [[6, "Ezra", "Eastport"], [2, "Leo", "Southport"], [1, "Mira", "Northport"], [3, "Nora", "Northport"], [4, "Owen", "Westport"]]}
+{"id": "s06_q02", "columns": ["appointment_id", "fee"], "rows": [[103, 200.0], [104, 180.0], [107, 150.0], [102, 120.0], [106, 120.0]]}
+{"id": "s06_q03", "columns": ["status", "appointment_count"], "rows": [["cancelled", 1], ["completed", 7], ["no_show", 1], ["scheduled", 1]]}
+{"id": "s06_q04", "columns": ["patient_id", "name", "appointment_count"], "rows": [[1, "Mira", 2], [2, "Leo", 2], [3, "Nora", 2], [4, "Owen", 2], [5, "Iris", 2], [6, "Ezra", 0]]}
+{"id": "s06_q05", "columns": ["clinician_id", "name", "completed_count", "average_fee"], "rows": [[1, "Dr Rowan", 3, 106.67], [2, "Dr Ellis", 2, 190.0]]}
+{"id": "s06_q06", "columns": ["appointment_id", "name", "fee", "total_payments", "balance_due"], "rows": [[101, "Mira", 100.0, 100.0, 0.0], [102, "Leo", 120.0, 100.0, 20.0], [103, "Mira", 200.0, 200.0, 0.0], [104, "Nora", 180.0, 180.0, 0.0], [106, "Nora", 120.0, 120.0, 0.0], [107, "Iris", 150.0, 160.0, -10.0], [110, "Iris", 100.0, 0.0, 100.0]]}
+{"id": "s06_q07", "columns": ["clinician_id", "name", "completed_count"], "rows": [[1, "Dr Rowan", 3], [2, "Dr Ellis", 2], [3, "Dr Sage", 1], [4, "Dr Lane", 1], [5, "Dr River", 0], [6, "Dr Ash", 0]]}
+{"id": "s06_q08", "columns": ["appointment_id", "payment_id", "amount"], "rows": [[101, 1, 60.0], [101, 2, 40.0], [102, 3, 100.0], [103, 4, 200.0], [104, 5, 180.0], [105, null, null], [106, 6, 120.0], [107, 7, 160.0], [108, null, null], [109, null, null], [110, null, null], [null, 8, 25.0]]}
+{"id": "s06_q09", "columns": ["specialty", "appointment_id", "fee"], "rows": [["Cardiology", 103, 200.0], ["Dermatology", 107, 150.0], ["General", 102, 120.0], ["General", 106, 120.0]]}
+{"id": "s06_q10", "columns": ["patient_id", "name"], "rows": [[1, "Mira"], [3, "Nora"]]}
+{"id": "s07_q01", "columns": ["account_id", "account_number"], "rows": [[1, "A100"], [3, "A102"], [4, "A103"], [8, "A107"]]}
+{"id": "s07_q02", "columns": ["entry_id", "account_id", "posted_at", "amount"], "rows": [[12, 6, "2025-03-02", -90.0], [14, 8, "2025-03-04", -20.0], [7, 3, "2025-03-20", -50.0]]}
+{"id": "s07_q03", "columns": ["entry_type", "entry_count", "signed_total"], "rows": [["deposit", 5, 1250.0], ["fee", 2, -20.0], ["interest", 1, 20.0], ["withdrawal", 7, -1170.0]]}
+{"id": "s07_q04", "columns": ["customer_id", "name", "combined_balance"], "rows": [[1, "Ari", 2810.0], [2, "Bo", 700.0], [3, "Cy", 1100.0], [4, "Dee", 0.0], [5, "Eli", 0.0], [6, "Faye", 320.0]]}
+{"id": "s07_q05", "columns": ["account_number", "negative_entry_count", "money_removed"], "rows": [["A100", 2, 210.0], ["A105", 2, 100.0], ["A107", 2, 30.0]]}
+{"id": "s07_q06", "columns": ["account_number", "entry_count", "net_change"], "rows": [["A100", 3, 290.0], ["A101", 2, -480.0], ["A102", 2, 200.0], ["A103", 1, 100.0], ["A104", 2, 0.0], ["A105", 2, -100.0], ["A106", 0, 0.0], ["A107", 2, 80.0]]}
+{"id": "s07_q07", "columns": ["account_number", "book_balance", "statement_balance", "difference"], "rows": [["A101", 1520.0, 1500.0, 20.0]]}
+{"id": "s07_q08", "columns": ["account_number", "book_balance", "statement_balance", "difference"], "rows": [["A100", 1290.0, 1290.0, 0.0], ["A101", 1520.0, 1500.0, 20.0], ["A102", 700.0, 700.0, 0.0], ["A103", 100.0, null, null], ["A104", 1000.0, 1000.0, 0.0], ["A105", 0.0, 0.0, 0.0], ["A106", 200.0, null, null], ["A107", 130.0, null, null], ["A999", null, 45.0, null]]}
+{"id": "s07_q09", "columns": ["account_number", "entry_id", "posted_at", "running_balance"], "rows": [["A100", 1, "2025-01-05", 1500.0], ["A100", 2, "2025-01-05", 1300.0], ["A100", 3, "2025-03-01", 1290.0], ["A101", 4, "2025-02-10", 1500.0], ["A101", 5, "2025-03-31", 1520.0], ["A102", 6, "2025-01-15", 750.0], ["A102", 7, "2025-03-20", 700.0], ["A103", 8, "2025-02-01", 100.0], ["A104", 9, "2025-01-20", 700.0], ["A104", 10, "2025-02-20", 1000.0], ["A105", 11, "2025-03-01", 90.0], ["A105", 12, "2025-03-02", 0.0], ["A107", 13, "2025-03-03", 150.0], ["A107", 14, "2025-03-04", 130.0], ["A107", 15, "2025-04-01", 120.0]]}
+{"id": "s07_q10", "columns": ["account_number", "kind", "current_balance"], "rows": [["A103", "checking", 100.0], ["A106", "savings", 200.0], ["A107", "checking", 120.0]]}
+{"id": "s08_q01", "columns": ["subscription_id", "customer_id", "plan_id", "start_date"], "rows": [[1, 1, 1, "2025-01-01"], [3, 2, 2, "2025-01-01"], [4, 3, 3, "2025-01-01"], [7, 5, 2, "2025-03-01"], [8, 5, 5, "2025-03-01"]]}
+{"id": "s08_q02", "columns": ["invoice_id", "billed_on", "amount"], "rows": [[9, "2025-02-01", 100.0], [12, "2025-03-01", 50.0]]}
+{"id": "s08_q03", "columns": ["MONTH", "revenue"], "rows": [["2025-01", 233.0], ["2025-02", 70.0]]}
+{"id": "s08_q04", "columns": ["customer_id", "name", "paid_total"], "rows": [[1, "Acorn", 88.0], [2, "Birch", 95.0], [3, "Cedar", 120.0], [4, "Dahlia", 0.0], [5, "Elm", 0.0], [6, "Fern", 0.0]]}
+{"id": "s08_q05", "columns": ["plan_id", "name", "active_subscription_count"], "rows": [[1, "Basic", 1], [2, "Pro", 2], [3, "Business", 1], [4, "Flex", 0], [5, "Premium", 1], [6, "Legacy", 0]]}
+{"id": "s08_q06", "columns": ["subscription_id", "name", "units_used", "overage_units"], "rows": [[1, "Basic", 110, 10], [3, "Pro", 550, 50], [4, "Business", 1100, 100]]}
+{"id": "s08_q07", "columns": ["customer_id", "name", "open_invoice_count", "open_amount"], "rows": [[3, "Cedar", 1, 100.0], [5, "Elm", 1, 50.0]]}
+{"id": "s08_q08", "columns": ["subscription_id", "customer_name", "plan_name"], "rows": [[8, "Elm", "Premium"]]}
+{"id": "s08_q09", "columns": ["customer_id", "invoice_id", "billed_on", "running_paid_amount"], "rows": [[1, 1, "2025-01-01", 18.0], [1, 4, "2025-01-01", 68.0], [1, 2, "2025-02-01", 88.0], [2, 6, "2025-01-01", 45.0], [2, 7, "2025-02-01", 95.0], [3, 8, "2025-01-01", 100.0], [3, 10, "2025-01-01", 120.0]]}
+{"id": "s08_q10", "columns": ["customer_id", "name"], "rows": [[1, "Acorn"], [2, "Birch"], [3, "Cedar"]]}
+{"id": "s09_q01", "columns": ["ticket_id", "opened_at", "assigned_agent_id"], "rows": [[4, "2025-01-05 09:00:00", null], [13, "2025-01-05 09:00:00", 3], [12, "2025-01-12 09:00:00", null]]}
+{"id": "s09_q02", "columns": ["priority", "closed_ticket_count"], "rows": [["high", 3], ["low", 1], ["normal", 2]]}
+{"id": "s09_q03", "columns": ["agent_id", "name"], "rows": [[1, "Anika"], [2, "Bram"]]}
+{"id": "s09_q04", "columns": ["team_id", "team_name", "unresolved_ticket_count"], "rows": [[1, "Billing", 3], [2, "Technical", 2], [3, "Shipping", 1], [4, "Returns", 1], [5, "Security", 0], [6, "Enterprise", 0]]}
+{"id": "s09_q05", "columns": ["customer_id", "customer_name", "ticket_count", "unassigned_ticket_count"], "rows": [[1, "Atlas", 3, 0], [2, "Brook", 3, 1], [3, "Cove", 3, 0], [4, "Dune", 2, 1], [5, "Ember", 3, 1], [6, "Flint", 0, 0]]}
+{"id": "s09_q06", "columns": ["ticket_id", "first_reply_at", "response_hours"], "rows": [[1, "2025-01-02 10:00:00", 1.0], [2, "2025-01-04 13:00:00", 4.0], [3, "2025-01-03 10:30:00", 0.5], [5, "2025-01-06 09:15:00", 0.25], [6, "2025-01-04 17:00:00", 8.0], [7, "2025-01-07 11:00:00", 2.0], [8, "2025-01-08 13:00:00", 4.0], [10, "2025-01-04 12:00:00", 3.0], [11, "2025-01-11 14:00:00", 5.0]]}
+{"id": "s09_q07", "columns": ["agent_id", "agent_name", "closed_ticket_count"], "rows": [[3, "Cleo", 2]]}
+{"id": "s09_q08", "columns": ["team_id", "team_name", "ticket_id", "opened_at"], "rows": [[1, "Billing", 2, "2025-01-04 09:00:00"], [2, "Technical", 4, "2025-01-05 09:00:00"], [3, "Shipping", 6, "2025-01-04 09:00:00"], [4, "Returns", 9, "2025-01-09 09:00:00"]]}
+{"id": "s09_q09", "columns": ["agent_id", "agent_name", "ticket_id", "status"], "rows": [[1, "Anika", 1, "closed"], [1, "Anika", 2, "open"], [1, "Anika", 10, "pending"], [2, "Bram", null, null], [3, "Cleo", 3, "closed"], [3, "Cleo", 11, "closed"], [3, "Cleo", 13, "open"], [4, "Dara", 5, "closed"], [4, "Dara", 14, "pending"], [5, "Enzo", 6, "pending"], [5, "Enzo", 7, "closed"], [6, "Farah", 8, "closed"], [7, "Gus", null, null], [null, null, 4, "open"], [null, null, 9, "open"], [null, null, 12, "open"]]}
+{"id": "s09_q10", "columns": ["team_id", "team_name", "agent_id", "agent_name", "unresolved_ticket_count"], "rows": [[1, "Billing", 1, "Anika", 2], [2, "Technical", 3, "Cleo", 1], [2, "Technical", 4, "Dara", 1], [3, "Shipping", 5, "Enzo", 1]]}
+{"id": "s10_q01", "columns": ["room_number", "room_type", "nightly_rate"], "rows": [["201", "Double", 160.0], ["202", "Double", 160.0], ["101", "Standard", 110.0], ["102", "Standard", 110.0], ["402", "Studio", 80.0]]}
+{"id": "s10_q02", "columns": ["booking_id", "check_in", "check_out"], "rows": [[7, "2025-02-02", "2025-02-05"], [10, "2025-03-01", "2025-03-05"]]}
+{"id": "s10_q03", "columns": ["booking_id", "nights", "booking_value"], "rows": [[1, 6, 600.0], [2, 2, 220.0], [3, 3, 450.0], [5, 2, 500.0], [6, 2, 220.0], [8, 2, 320.0], [11, 2, 480.0], [12, 3, 870.0]]}
+{"id": "s10_q04", "columns": ["room_id", "room_number", "completed_booking_count", "total_nights"], "rows": [[1, "101", 2, 8], [2, "102", 1, 2], [3, "201", 2, 5], [4, "202", 0, 0], [5, "301", 2, 4], [6, "302", 1, 3], [7, "401", 0, 0], [8, "402", 0, 0]]}
+{"id": "s10_q05", "columns": ["guest_id", "guest_name", "completed_booking_value"], "rows": [[1, "Ada", 1530.0], [2, "Beau", 220.0], [3, "Cora", 1370.0], [4, "Dion", 220.0], [5, "Esme", 320.0], [6, "Finn", 0.0]]}
+{"id": "s10_q06", "columns": ["room_type", "net_payments"], "rows": [["Double", 720.0], ["Standard", 740.0], ["Suite", 980.0]]}
+{"id": "s10_q07", "columns": ["booking_id", "guest_name", "room_number", "outstanding_balance"], "rows": [[1, "Ada", "101", 300.0], [3, "Ada", "201", 50.0], [12, "Cora", "302", 870.0]]}
+{"id": "s10_q08", "columns": ["room_number", "first_booking_id", "second_booking_id"], "rows": [["102", 2, 13]]}
+{"id": "s10_q09", "columns": ["room_type", "room_number", "completed_booking_value"], "rows": [["Double", "201", 770.0], ["Standard", "101", 820.0], ["Studio", "401", 0.0], ["Studio", "402", 0.0], ["Suite", "301", 980.0]]}
+{"id": "s10_q10", "columns": ["guest_id", "guest_name", "average_nights"], "rows": [[1, "Ada", 3.67]]}
+{"id": "s11_q01", "columns": ["part_id", "name", "unit_cost"], "rows": [[6, "LED board", 12.0], [4, "Steel plate", 8.0], [10, "Shade", 6.0], [7, "Cable", 3.0]]}
+{"id": "s11_q02", "columns": ["work_order_id", "part_id", "quantity", "due_date"], "rows": [[3, 2, 20, "2025-01-20"], [5, 1, 8, "2025-02-01"]]}
+{"id": "s11_q03", "columns": ["status", "work_order_count"], "rows": [["cancelled", 1], ["completed", 4], ["in_progress", 1], ["planned", 2]]}
+{"id": "s11_q04", "columns": ["part_id", "name", "active_quantity"], "rows": [[1, "Desk lamp", 8], [2, "Base module", 20], [3, "Light head", 0], [4, "Steel plate", 0], [5, "Screw", 0], [6, "LED board", 0], [7, "Cable", 0], [8, "Switch", 0], [9, "Spare fuse", 0], [10, "Shade", 6], [11, "Controller assembly", 0]]}
+{"id": "s11_q05", "columns": ["work_order_id", "part_name", "days_late", "quantity"], "rows": [[2, "Desk lamp", 2, 5], [7, "Spare fuse", 2, 30]]}
+{"id": "s11_q06", "columns": ["part_id", "name", "component_count", "component_quantity"], "rows": [[1, "Desk lamp", 4, 5.0], [2, "Base module", 2, 5.0], [3, "Light head", 3, 4.0], [11, "Controller assembly", 0, 0]]}
+{"id": "s11_q07", "columns": ["part_id", "name", "completed_quantity", "component_count"], "rows": [[1, "Desk lamp", 15, 4], [3, "Light head", 12, 3], [9, "Spare fuse", 30, 0]]}
+{"id": "s11_q08", "columns": ["part_id", "work_order_id", "completed_date", "previous_completed_date", "gap_days"], "rows": [[1, 1, "2025-01-09", null, null], [1, 2, "2025-01-17", "2025-01-09", 8], [3, 6, "2025-02-03", null, null], [9, 7, "2025-02-12", null, null]]}
+{"id": "s11_q09", "columns": ["leaf_part_id", "name", "required_quantity", "material_cost"], "rows": [[4, "Steel plate", 3.0, 24.0], [5, "Screw", 18.0, 9.0], [6, "LED board", 3.0, 36.0], [7, "Cable", 6.0, 18.0], [8, "Switch", 3.0, 6.0], [10, "Shade", 3.0, 18.0]]}
+{"id": "s11_q10", "columns": ["ancestor_part_id", "descendant_part_id", "required_quantity"], "rows": [[1, 2, 1.0], [1, 3, 1.0], [1, 4, 1.0], [1, 5, 6.0], [1, 6, 1.0], [1, 7, 2.0], [1, 8, 1.0], [1, 10, 1.0], [2, 4, 1.0], [2, 5, 4.0], [3, 5, 2.0], [3, 6, 1.0], [3, 10, 1.0]]}
+{"id": "s12_q01", "columns": ["product_id", "sku", "name", "reorder_level"], "rows": [[5, "CAB-01", "Cable", 20], [2, "MOU-01", "Mouse", 10], [3, "KEY-01", "Keyboard", 5]]}
+{"id": "s12_q02", "columns": ["movement_id", "warehouse_id", "product_id", "movement_date", "quantity_change"], "rows": [[2, 1, 1, "2025-01-03", -3], [6, 1, 2, "2025-01-04", -5], [3, 1, 1, "2025-01-05", -2], [9, 2, 1, "2025-01-06", -3], [11, 2, 5, "2025-01-07", -5], [7, 1, 2, "2025-01-08", -5]]}
+{"id": "s12_q03", "columns": ["warehouse_id", "total_on_hand"], "rows": [[1, 25], [2, 22], [3, 12], [4, 0], [5, 6]]}
+{"id": "s12_q04", "columns": ["warehouse_id", "name", "total_on_hand", "stock_record_count"], "rows": [[1, "North Depot", 25, 3], [2, "South Depot", 22, 3], [3, "East Depot", 12, 2], [4, "West Depot", 0, 1], [5, "Central Depot", 6, 1], [6, "Overflow", 0, 0]]}
+{"id": "s12_q05", "columns": ["warehouse_id", "product_id", "on_hand"], "rows": [[1, 1, 5], [1, 2, 10], [1, 3, 10], [1, 4, 0], [1, 5, 0], [1, 6, 0], [2, 1, 2], [2, 2, 0], [2, 3, 0], [2, 4, 0], [2, 5, 20], [2, 6, 0], [3, 1, 0], [3, 2, 8], [3, 3, 0], [3, 4, 0], [3, 5, 0], [3, 6, 4], [4, 1, 0], [4, 2, 0], [4, 3, 0], [4, 4, 0], [4, 5, 0], [4, 6, 0], [5, 1, 0], [5, 2, 0], [5, 3, 6], [5, 4, 0], [5, 5, 0], [5, 6, 0], [6, 1, 0], [6, 2, 0], [6, 3, 0], [6, 4, 0], [6, 5, 0], [6, 6, 0]]}
+{"id": "s12_q06", "columns": ["product_id", "name", "total_on_hand", "january_net_change"], "rows": [[1, "Laptop", 7, 11], [2, "Mouse", 18, 10], [3, "Keyboard", 16, 0], [4, "Monitor", 0, 0], [5, "Cable", 20, 20], [6, "Webcam", 4, 4]]}
+{"id": "s12_q07", "columns": ["warehouse_id", "warehouse_name", "product_id", "product_name", "on_hand", "last_counted"], "rows": [[1, "North Depot", 3, "Keyboard", 10, "2025-01-05"], [2, "South Depot", 4, "Monitor", 0, null], [3, "East Depot", 2, "Mouse", 8, "2025-01-01"], [3, "East Depot", 6, "Webcam", 4, null], [4, "West Depot", 5, "Cable", 0, "2025-01-02"]]}
+{"id": "s12_q08", "columns": ["movement_id", "product_id", "movement_date", "quantity_change", "running_net_change"], "rows": [[1, 1, "2025-01-01", 10, 10], [2, 1, "2025-01-03", -3, 7], [3, 1, "2025-01-05", -2, 5], [4, 1, "2025-01-10", 4, 9], [5, 2, "2025-01-01", 20, 20], [6, 2, "2025-01-04", -5, 15], [7, 2, "2025-01-08", -5, 10]]}
+{"id": "s12_q09", "columns": ["warehouse_id", "product_id", "on_hand", "stock_rank"], "rows": [[1, 2, 10, 1], [1, 3, 10, 1], [1, 1, 5, 2], [2, 5, 20, 1], [2, 1, 2, 2], [2, 4, 0, 3], [3, 2, 8, 1], [3, 6, 4, 2], [4, 5, 0, 1], [5, 3, 6, 1]]}
+{"id": "s12_q10", "columns": ["movement_id", "warehouse_id", "product_id", "movement_date", "next_movement_date", "gap_days"], "rows": [[2, 1, 1, "2025-01-03", "2025-01-05", 2], [3, 1, 1, "2025-01-05", "2025-01-10", 5], [6, 1, 2, "2025-01-04", "2025-01-08", 4], [9, 2, 1, "2025-01-06", null, null], [11, 2, 5, "2025-01-07", null, null], [13, 2, 4, "2025-02-01", null, null]]}
+{"id": "s13_q01", "columns": ["meter_id", "label", "site_id"], "rows": [[1, "Main", 1], [2, "Annex", 1], [3, "Workshop", 2], [4, "Store", 3], [5, "New Annex", 4], [7, "Lab Main", 5], [8, "Lab Backup", 5]]}
+{"id": "s13_q02", "columns": ["reading_id", "meter_id", "reading_at", "reading_kwh"], "rows": [[2, 1, "2025-01-02 00:00:00", 118.0], [5, 2, "2025-01-02 00:00:00", 56.0], [12, 4, "2025-01-02 00:00:00", 18.0]]}
+{"id": "s13_q03", "columns": ["meter_id", "valid_reading_count", "minimum_kwh", "maximum_kwh"], "rows": [[1, 5, 100.0, 150.0], [2, 3, 50.0, 68.0], [3, 2, 200.0, 250.0], [4, 2, 0.0, 18.0], [5, 0, null, null], [6, 1, 0.0, 0.0]]}
+{"id": "s13_q04", "columns": ["site_id", "name", "meter_count", "active_meter_count"], "rows": [[1, "North Office", 2, 2], [2, "South Workshop", 1, 1], [3, "East Store", 1, 1], [4, "West Annex", 2, 1], [5, "Central Lab", 2, 2], [6, "Unused North Site", 0, 0]]}
+{"id": "s13_q05", "columns": ["meter_id", "label", "site_name"], "rows": [[5, "New Annex", "West Annex"], [7, "Lab Main", "Central Lab"], [8, "Lab Backup", "Central Lab"]]}
+{"id": "s13_q06", "columns": ["site_id", "meter_id", "label", "minimum_kwh", "maximum_kwh", "observed_range_kwh"], "rows": [[1, 1, "Main", 100.0, 150.0, 50.0], [1, 2, "Annex", 50.0, 68.0, 18.0], [2, 3, "Workshop", 200.0, 250.0, 50.0], [3, 4, "Store", 0.0, 18.0, 18.0]]}
+{"id": "s13_q07", "columns": ["reading_id", "meter_id", "reading_date", "price_per_kwh"], "rows": [[1, 1, "2025-01-01", 0.2], [2, 1, "2025-01-02", 0.3], [3, 1, "2025-01-03", 0.3], [4, 2, "2025-01-01", 0.2], [5, 2, "2025-01-02", 0.3], [7, 2, "2025-01-04", 0.3], [8, 3, "2025-01-01", 0.15], [9, 1, "2025-01-03", 0.3], [10, 3, "2025-01-04", 0.15], [11, 4, "2025-01-01", 0.25], [12, 4, "2025-01-02", 0.25], [14, 6, "2025-01-01", 0.18], [15, 1, "2025-01-05", 0.3]]}
+{"id": "s13_q08", "columns": ["meter_id", "reading_id", "reading_at", "elapsed_hours", "consumed_kwh", "average_kw"], "rows": [[1, 2, "2025-01-02 00:00:00", 24.0, 18.0, 0.75], [1, 3, "2025-01-03 00:00:00", 24.0, 12.0, 0.5], [1, 9, "2025-01-03 00:00:00", 0.0, 10.0, null], [1, 15, "2025-01-05 00:00:00", 48.0, 10.0, 0.208], [2, 5, "2025-01-02 00:00:00", 24.0, 6.0, 0.25], [2, 7, "2025-01-04 00:00:00", 48.0, 12.0, 0.25], [3, 10, "2025-01-04 00:00:00", 72.0, 50.0, 0.694], [4, 12, "2025-01-02 00:00:00", 24.0, 18.0, 0.75]]}
+{"id": "s13_q09", "columns": ["meter_id", "reading_id", "reading_at", "consumed_kwh", "trailing_mean_kwh"], "rows": [[1, 2, "2025-01-02 00:00:00", 18.0, 18.0], [1, 3, "2025-01-03 00:00:00", 12.0, 15.0], [1, 9, "2025-01-03 00:00:00", 10.0, 13.33], [1, 15, "2025-01-05 00:00:00", 10.0, 10.67], [2, 5, "2025-01-02 00:00:00", 6.0, 6.0], [2, 7, "2025-01-04 00:00:00", 12.0, 9.0], [3, 10, "2025-01-04 00:00:00", 50.0, 50.0], [4, 12, "2025-01-02 00:00:00", 18.0, 18.0]]}
+{"id": "s13_q10", "columns": ["meter_id", "label", "observed_consumption_kwh", "consumption_rank"], "rows": [[1, "Main", 50.0, 1], [3, "Workshop", 50.0, 1], [2, "Annex", 18.0, 3], [4, "Store", 18.0, 3]]}
+{"id": "s14_q01", "columns": ["route_id", "name"], "rows": [[1, "River Line"], [2, "Market Line"], [3, "Airport Link"], [4, "Campus Shuttle"], [6, "Future Express"]]}
+{"id": "s14_q02", "columns": ["stop_id", "name"], "rows": [[1, "Library"], [2, "Market Square"], [7, "Station"]]}
+{"id": "s14_q03", "columns": ["status", "trip_count"], "rows": [["cancelled", 1], ["completed", 7], ["scheduled", 1]]}
+{"id": "s14_q04", "columns": ["route_id", "name", "stop_count", "last_stop_sequence"], "rows": [[1, "River Line", 4, 4], [2, "Market Line", 3, 3], [3, "Airport Link", 2, 2], [4, "Campus Shuttle", 2, 2], [5, "Old Town Loop", 1, 1], [6, "Future Express", 0, null]]}
+{"id": "s14_q05", "columns": ["trip_id", "route_name", "delay_minutes"], "rows": [[1, "River Line", 5.0], [2, "River Line", 0.0], [3, "River Line", 10.0], [4, "Market Line", -2.0], [7, "Airport Link", 5.0], [8, "Airport Link", 15.0], [10, "Old Town Loop", 0.0]]}
+{"id": "s14_q06", "columns": ["route_id", "name", "completed_trip_count", "stop_count"], "rows": [[1, "River Line", 3, 4], [2, "Market Line", 1, 3], [3, "Airport Link", 2, 2], [4, "Campus Shuttle", 0, 2], [5, "Old Town Loop", 1, 1], [6, "Future Express", 0, 0]]}
+{"id": "s14_q07", "columns": ["route_id", "origin_sequence", "origin_stop", "destination_stop", "segment_minutes"], "rows": [[1, 1, "Library", "Market Square", 5], [1, 2, "Market Square", "River Park", 7], [1, 3, "River Park", "Museum", 6], [2, 1, "South Gate", "Market Square", 4], [2, 2, "Market Square", "University", 8], [3, 1, "Station", "Airport", 9], [4, 1, "Library", "University", 12]]}
+{"id": "s14_q08", "columns": ["route_id", "stop_sequence", "stop_name", "elapsed_minutes"], "rows": [[1, 1, "Library", 0], [1, 2, "Market Square", 5], [1, 3, "River Park", 12], [1, 4, "Museum", 18], [2, 1, "South Gate", 0], [2, 2, "Market Square", 4], [2, 3, "University", 12], [3, 1, "Station", 0], [3, 2, "Airport", 9], [4, 1, "Library", 0], [4, 2, "University", 12], [5, 1, "Airport", 0]]}
+{"id": "s14_q09", "columns": ["route_id", "trip_id", "service_date", "actual_departure"], "rows": [[1, 3, "2025-01-01", "2025-01-01 09:10:00"], [2, 4, "2025-01-01", "2025-01-01 07:58:00"], [3, 8, "2025-01-03", "2025-01-03 10:15:00"], [5, 10, "2025-01-02", "2025-01-02 12:00:00"]]}
+{"id": "s14_q10", "columns": ["route_id", "trip_id", "service_date", "batch_number"], "rows": [[1, 1, "2025-01-01", 1], [1, 2, "2025-01-01", 1], [1, 3, "2025-01-01", 2], [2, 4, "2025-01-01", 1], [3, 7, "2025-01-01", 1], [3, 8, "2025-01-03", 2], [5, 10, "2025-01-02", 1]]}
+{"id": "s15_q01", "columns": ["visitor_id", "country", "signup_date"], "rows": [[2, "IN", "2025-01-02"], [8, "AU", "2025-01-02"], [4, "US", "2025-01-03"], [5, "CA", "2025-01-04"]]}
+{"id": "s15_q02", "columns": ["event_id", "session_id", "event_at", "revenue"], "rows": [[3, 1, "2025-01-01 00:05:00", 20.0], [8, 5, "2025-01-02 00:02:00", 30.0], [5, 2, "2025-01-02 00:03:00", 20.0], [14, 10, "2025-01-03 00:05:00", 30.0]]}
+{"id": "s15_q03", "columns": ["device", "session_count"], "rows": [["desktop", 6], ["mobile", 4], ["tablet", 2]]}
+{"id": "s15_q04", "columns": ["visitor_id", "country", "session_count"], "rows": [[1, "US", 4], [2, "IN", 2], [3, "GB", 2], [4, "US", 1], [5, "CA", 1], [6, "IN", 1], [7, "GB", 1], [8, "AU", 0]]}
+{"id": "s15_q05", "columns": ["referrer", "session_count", "converting_session_count", "purchase_revenue"], "rows": [["direct", 4, 1, 30.0], ["email", 2, 1, 20.0], ["search", 4, 2, 55.0], ["social", 2, 1, 10.0]]}
+{"id": "s15_q06", "columns": ["session_id", "event_count", "event_span_seconds"], "rows": [[1, 3, 240], [2, 2, 120], [3, 0, null], [4, 2, 120], [5, 1, 0], [6, 1, 0], [7, 2, 120], [8, 1, 0], [9, 1, 0], [10, 1, 0], [11, 0, null], [12, 1, 0]]}
+{"id": "s15_q07", "columns": ["country", "session_count", "converting_session_count", "conversion_percent"], "rows": [["CA", 1, 0, 0.0], ["GB", 3, 1, 33.33], ["IN", 3, 2, 66.67], ["US", 5, 2, 40.0]]}
+{"id": "s15_q08", "columns": ["visitor_id", "session_id", "started_at", "previous_started_at", "gap_hours"], "rows": [[1, 1, "2025-01-01 00:00:00", null, null], [1, 2, "2025-01-02 00:00:00", "2025-01-01 00:00:00", 24.0], [1, 3, "2025-01-02 00:00:00", "2025-01-02 00:00:00", 0.0], [1, 12, "2025-01-04 00:00:00", "2025-01-02 00:00:00", 48.0], [2, 4, "2025-01-01 00:00:00", null, null], [2, 5, "2025-01-02 00:00:00", "2025-01-01 00:00:00", 24.0], [3, 6, "2025-01-01 00:00:00", null, null], [3, 7, "2025-01-03 00:00:00", "2025-01-01 00:00:00", 48.0], [4, 8, "2025-01-02 00:00:00", null, null], [5, 9, "2025-01-02 00:00:00", null, null], [6, 10, "2025-01-03 00:00:00", null, null], [7, 11, "2025-01-03 00:00:00", null, null]]}
+{"id": "s15_q09", "columns": ["day", "purchase_revenue", "cumulative_revenue", "two_day_mean_revenue"], "rows": [["2025-01-01", 25.0, 25.0, 25.0], ["2025-01-02", 50.0, 75.0, 37.5], ["2025-01-03", 40.0, 115.0, 45.0], ["2025-01-04", 0.0, 115.0, 20.0]]}
+{"id": "s15_q10", "columns": ["visitor_id", "country", "purchase_revenue", "percentile_fraction"], "rows": [[4, "US", 0.0, 0.0], [5, "CA", 0.0, 0.0], [7, "GB", 0.0, 0.0], [8, "AU", 0.0, 0.0], [3, "GB", 10.0, 0.5714], [2, "IN", 30.0, 0.7143], [6, "IN", 30.0, 0.7143], [1, "US", 45.0, 1.0]]}
+{"id": "s16_q01", "columns": ["listing_id", "title"], "rows": [[2, "Tripod"], [8, "Chair"]]}
+{"id": "s16_q02", "columns": ["status", "listing_count"], "rows": [["closed", 2], ["open", 6]]}
+{"id": "s16_q03", "columns": ["bid_id", "listing_id", "bidder_id", "amount"], "rows": [[8, 3, 5, 240.0], [7, 3, 1, 220.0], [12, 5, 5, 170.0], [10, 5, 3, 165.0], [11, 5, 3, 160.0], [13, 6, 1, 130.0], [2, 1, 3, 110.0], [3, 1, 4, 110.0]]}
+{"id": "s16_q04", "columns": ["listing_id", "title", "bid_count", "highest_bid"], "rows": [[1, "Camera", 3, 110.0], [2, "Tripod", 3, 30.0], [3, "Bicycle", 2, 240.0], [4, "Lamp", 1, 40.0], [5, "Desk", 3, 170.0], [6, "Monitor", 1, 130.0], [7, "Bookcase", 2, 80.0], [8, "Chair", 0, null]]}
+{"id": "s16_q05", "columns": ["user_id"], "rows": [[1], [2], [3], [4], [5], [6]]}
+{"id": "s16_q06", "columns": ["user_id"], "rows": [[1], [2], [3], [4]]}
+{"id": "s16_q07", "columns": ["listing_id", "title"], "rows": [[1, "Camera"], [2, "Tripod"], [5, "Desk"], [6, "Monitor"]]}
+{"id": "s16_q08", "columns": ["seller_id", "name"], "rows": [[1, "Ada"], [2, "Ben"], [3, "Cleo"]]}
+{"id": "s16_q09", "columns": ["listing_id", "title", "bidder_id", "bid_id", "amount"], "rows": [[1, "Camera", 3, 2, 110.0], [1, "Camera", 4, 3, 110.0], [2, "Tripod", 3, 5, 30.0], [2, "Tripod", 4, 6, 30.0], [3, "Bicycle", 5, 8, 240.0], [4, "Lamp", 1, 9, 40.0], [5, "Desk", 5, 12, 170.0], [6, "Monitor", 1, 13, 130.0], [7, "Bookcase", 4, 14, 80.0], [7, "Bookcase", 5, 15, 80.0]]}
+{"id": "s16_q10", "columns": ["smaller_bidder_id", "larger_bidder_id", "shared_listing_count"], "rows": [[2, 3, 2], [2, 4, 2], [3, 4, 2]]}
+{"id": "s17_q01", "columns": ["question_id", "prompt"], "rows": [[1, "Support satisfaction"], [2, "Recommendation likelihood"], [4, "Ease of use"]]}
+{"id": "s17_q02", "columns": ["response_id", "participant_id", "question_id", "score"], "rows": [[1, 1, 1, 5.0], [2, 1, 2, 4.0], [3, 1, 4, 5.0], [6, 2, 4, 4.0], [8, 3, 1, 5.0], [9, 3, 2, 5.0], [10, 3, 4, 5.0], [11, 3, 5, 4.0], [14, 5, 3, 5.0]]}
+{"id": "s17_q03", "columns": ["group_name", "participant_count"], "rows": [["A", 2], ["B", 2], ["C", 1], ["Unassigned", 1]]}
+{"id": "s17_q04", "columns": ["question_id", "prompt", "answered_count", "average_score"], "rows": [[1, "Support satisfaction", 4, 3.75], [2, "Recommendation likelihood", 3, 4.0], [3, "Documentation quality", 2, 3.5], [4, "Ease of use", 3, 4.67], [5, "Response speed", 1, 4.0], [6, "Training quality", 0, null]]}
+{"id": "s17_q05", "columns": ["participant_id"], "rows": [[2]]}
+{"id": "s17_q06", "columns": ["participant_id"], "rows": [[1], [1], [2], [3], [3], [4], [4]]}
+{"id": "s17_q07", "columns": ["participant_id", "name", "answered_count"], "rows": [[1, "Ana", 3], [2, "Bo", 3], [3, "Cy", 4], [4, "Dee", 2], [5, "Ena", 1], [6, "Flo", 0]]}
+{"id": "s17_q08", "columns": ["participant_id", "name"], "rows": [[1, "Ana"], [3, "Cy"]]}
+{"id": "s17_q09", "columns": ["smaller_participant_id", "larger_participant_id"], "rows": [[1, 3]]}
+{"id": "s17_q10", "columns": ["group_name", "completion_percent"], "rows": [["A", 83.33], ["B", 83.33], ["C", 0.0], ["Unassigned", 0.0]]}
+{"id": "s18_q01", "columns": ["player_id", "name", "position"], "rows": [[1, "Mia", "striker"], [2, "Leo", "defender"], [9, "Nina", "goalkeeper"]]}
+{"id": "s18_q02", "columns": ["match_id", "home_team_id", "away_team_id", "goals_each"], "rows": [[5, 1, 3, 1], [6, 4, 5, 0]]}
+{"id": "s18_q03", "columns": ["team_id", "name", "player_count"], "rows": [[1, "Falcons", 3], [2, "Bears", 2], [3, "Cobras", 1], [4, "Dolphins", 1], [5, "Eagles", 1], [6, "Foxes", 1], [7, "Gulls", 0]]}
+{"id": "s18_q04", "columns": ["player_id", "name", "recorded_goals"], "rows": [[1, "Mia", 4], [3, "Noah", 3], [4, "Ava", 2], [5, "Eli", 1], [6, "Ivy", 1], [7, "Zoe", 1], [2, "Leo", 0], [8, "Owen", 0], [9, "Nina", 0]]}
+{"id": "s18_q05", "columns": ["team_id"], "rows": [[1], [2], [3], [4], [5]]}
+{"id": "s18_q06", "columns": ["team_id"], "rows": [[1], [2]]}
+{"id": "s18_q07", "columns": ["team_id", "name", "points"], "rows": [[1, "Falcons", 10], [2, "Bears", 6], [3, "Cobras", 4], [4, "Dolphins", 1], [5, "Eagles", 1], [6, "Foxes", 0], [7, "Gulls", 0]]}
+{"id": "s18_q08", "columns": ["team_id", "name"], "rows": [[1, "Falcons"]]}
+{"id": "s18_q09", "columns": ["player_id", "name"], "rows": [[6, "Ivy"]]}
+{"id": "s18_q10", "columns": ["team_id", "opponent_id", "opponent_points"], "rows": [[1, 2, 6], [2, 4, 1], [3, 2, 6]]}
+{"id": "s19_q01", "columns": ["run_id", "experiment_id", "variant"], "rows": [[1, 1, "control"], [2, 1, "treatment"], [3, 2, "control"], [5, 3, "control"], [6, 3, "treatment"], [9, 2, "treatment"], [10, 1, "control"]]}
+{"id": "s19_q02", "columns": ["measurement_id", "run_id", "metric"], "rows": [[15, 8, "yield"]]}
+{"id": "s19_q03", "columns": ["metric", "unit"], "rows": [["duration", "minutes"]]}
+{"id": "s19_q04", "columns": ["experiment_id", "name", "run_count", "completed_runs", "failed_runs"], "rows": [[1, "Soil", 3, 3, 0], [2, "Pigment", 3, 2, 1], [3, "Battery", 2, 2, 0], [4, "Enzymes", 1, 0, 0], [5, "Coating", 1, 0, 1], [6, "Membrane", 0, 0, 0]]}
+{"id": "s19_q05", "columns": ["run_id"], "rows": [[2]]}
+{"id": "s19_q06", "columns": ["value"], "rows": [[20.0], [20.0], [20.0]]}
+{"id": "s19_q07", "columns": ["run_id", "target_coverage_percent"], "rows": [[1, 100.0], [2, 66.67], [3, 100.0], [4, 33.33], [5, 33.33], [6, 33.33], [7, 0.0], [8, 0.0], [9, 0.0], [10, 33.33]]}
+{"id": "s19_q08", "columns": ["run_id", "experiment_id"], "rows": [[1, 1], [3, 2]]}
+{"id": "s19_q09", "columns": ["experiment_id", "control_mean", "treatment_mean", "percent_change"], "rows": [[1, 75.0, 90.0, 20.0], [3, 80.0, 80.0, 0.0]]}
+{"id": "s19_q10", "columns": ["metric", "run_id", "mean_value", "distance"], "rows": [["pressure", 1, 100.0, 0.0], ["temperature", 1, 20.0, 0.0], ["temperature", 2, 20.0, 0.0], ["yield", 3, 70.0, 0.0]]}
+{"id": "s20_q01", "columns": ["task_id", "project_id", "title", "due_date"], "rows": [[5, 1, "Launch", null], [10, 3, "Implement", "2025-05-20"]]}
+{"id": "s20_q02", "columns": ["person_id", "name", "total_hours"], "rows": [[1, "Ann", 10.0], [2, "Bob", 8.0], [3, "Cia", 2.0], [4, "Dan", 8.0], [5, "Eva", 3.0], [6, "Vera", 8.0], [7, "Omar", 0.0]]}
+{"id": "s20_q03", "columns": ["task_id", "title", "status"], "rows": [[5, "Launch", "open"], [11, "Audit", "open"]]}
+{"id": "s20_q04", "columns": ["project_id", "name", "known_cost", "unpriced_hours"], "rows": [[1, "Atlas", 710.0, 2.0], [2, "Boreal", 455.0, 0.0], [3, "Cedar", 270.0, 0.0], [4, "Delta", 560.0, 0.0], [5, "Elm", 0.0, 0.0], [6, "Fern", 0.0, 0.0]]}
+{"id": "s20_q05", "columns": ["task_id", "title"], "rows": [[3, "Build"], [7, "Prototype"], [10, "Implement"], [11, "Audit"]]}
+{"id": "s20_q06", "columns": ["task_id", "depends_on", "assignee_id"], "rows": [[3, 1, 1], [7, 6, 4], [12, 11, 6]]}
+{"id": "s20_q07", "columns": ["project_id", "name"], "rows": [[3, "Cedar"], [4, "Delta"]]}
+{"id": "s20_q08", "columns": ["task_id", "title"], "rows": [[1, "Scope"], [2, "Design"], [3, "Build"], [4, "QA"]]}
+{"id": "s20_q09", "columns": ["project_id", "task_id", "title", "known_cost"], "rows": [[1, 2, "Design", 300.0], [2, 7, "Prototype", 245.0], [3, 10, "Implement", 150.0], [4, 11, "Audit", 280.0], [4, 12, "Report", 280.0]]}
+{"id": "s20_q10", "columns": ["project_id", "task_count", "dependency_edge_count", "total_hours"], "rows": [[1, 5, 6, 15.0], [2, 3, 2, 11.0], [3, 2, 1, 5.0], [4, 2, 2, 8.0], [5, 0, 0, 0.0], [6, 0, 0, 0.0]]}
