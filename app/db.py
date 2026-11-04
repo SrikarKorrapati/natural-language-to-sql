@@ -19,27 +19,12 @@ class Database:
         return sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=3)
 
     def schema(self) -> list[dict]:
-        def quote(name):
-            return '"' + name.replace('"', '""') + '"'
-
         with closing(self.connect()) as conn:
             tables = conn.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') "
                 "AND name NOT LIKE 'sqlite_%' ORDER BY name"
             ).fetchall()
-            return [
-                {
-                    "name": name,
-                    "sql": sql,
-                    "foreign_keys": [
-                        {"table": row[2], "from": row[3], "to": row[4]}
-                        for row in conn.execute(
-                            f"PRAGMA foreign_key_list({quote(name)})"
-                        )
-                    ],
-                }
-                for name, sql in tables
-            ]
+            return [{"name": name, "sql": sql} for name, sql in tables]
 
     @staticmethod
     def authorize(action, arg1, arg2, database, trigger):

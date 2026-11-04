@@ -31,6 +31,17 @@ def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
     assert retriever.rank(query, documents, 3) == [0, 1, 2]
 
 
+def test_equal_rank_weights_balance_opposite_rankings():
+    query = "revenue cost"
+    documents = ["revenue", "revenue cost forecast"]
+    vectors = {query: [1, 0], documents[0]: [1, 0], documents[1]: [0, 1]}
+    retriever = Retriever(lambda texts: [vectors[text] for text in texts])
+    assert keyword_rank(query, documents) == [1, 0]
+    retriever.prepare([query, *documents])
+    # Opposite first/second ranks contribute equally; input order breaks the tie.
+    assert retriever.rank(query, documents, 2) == [0, 1]
+
+
 def test_semantic_search_finds_synonyms_and_uses_cosine_similarity():
     vectors = {"buyers": [1, 0], "customers": [3, 0], "products": [100, 100]}
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
@@ -47,15 +58,15 @@ def test_cache_embeds_only_new_or_changed_text():
         return [[1, 2] for _ in texts]
 
     retriever = Retriever(embed)
-    initial = ["question", "CREATE TABLE people (id INT)", "past question"]
+    initial = ["question", "List customers", "past question"]
     assert retriever.prepare([*initial, "past question"])
     assert retriever.prepare(initial)
     assert retriever.prepare([*initial, "new history question"])
-    assert retriever.prepare(["question", "CREATE TABLE people (id INT, name TEXT)"])
+    assert retriever.prepare(["question", "List customer names"])
     assert batches == [
         initial,
         ["new history question"],
-        ["CREATE TABLE people (id INT, name TEXT)"],
+        ["List customer names"],
     ]
 
 
@@ -125,10 +136,10 @@ def test_embedding_provider_configuration_and_process_cache(
 
     monkeypatch.setattr(retrieval_module, "OpenAI", client)
     first = configured_retriever()
-    assert first.prepare(["provider configuration query", "customer schema"])
+    assert first.prepare(["provider configuration query", "past customer question"])
     second = configured_retriever()
     assert second is first
-    assert second.prepare(["provider configuration query", "customer schema"])
+    assert second.prepare(["provider configuration query", "past customer question"])
     assert len(requests) == 1
     # API indexes associate inputs with vectors even when response rows are reversed.
     assert first.cache["provider configuration query"] == pytest.approx([2**-0.5] * 2)
@@ -160,7 +171,7 @@ def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
     assert retriever.rank("customers", ["customers", "orders"], 2) == [0]
 
 
-def test_schema_embedding_includes_views_and_preserves_foreign_key_expansion(tmp_path):
+def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path):
     path = tmp_path / "source.db"
     with sqlite3.connect(path) as connection:
         connection.executescript("""
@@ -172,53 +183,61 @@ def test_schema_embedding_includes_views_and_preserves_foreign_key_expansion(tmp
             CREATE TABLE unrelated_b (value TEXT);
             CREATE TABLE unrelated_c (value TEXT);
         """)
-    embedded = []
+    batches, contexts = [], []
 
     def embed(texts):
-        embedded.extend(texts)
-        ranks = {
-            "orders": [1, 0],
-            "unrelated_a": [0.9, 0.1],
-            "unrelated_b": [0.8, 0.2],
-            "unrelated_c": [0.7, 0.3],
-        }
-        return [
-            (
-                next(
-                    (
-                        vector
-                        for name, vector in ranks.items()
-                        if f"CREATE TABLE {name} " in text
-                    ),
-                    [0, 1],
-                )
-                if "CREATE " in text
-                else [1, 0]
-            )
-            for text in texts
-        ]
+        batches.append(list(texts))
+        return [[1, 0] for _ in texts]
+
+    def complete(model, messages):
+        contexts.append(json.loads(messages[1]["content"]))
+        return {"sql": "SELECT 1", "explanation": "One."}
 
     database = Database(path)
-    agent = SQLAgent(
-        database,
-        History(tmp_path / "history.db", dataset=str(path)),
-        complete=lambda model, messages: {"sql": "SELECT 1", "explanation": "One."},
-        retriever=Retriever(embed),
-    )
-    proposal = agent.propose("Who purchased recently?", "session", "test-model")
+    history = History(tmp_path / "history.db", dataset=str(path))
+    previous_question = "List customer names"
+    history.save("past", previous_question, "test", "SELECT name FROM customers")
+    agent = SQLAgent(database, history, complete=complete, retriever=Retriever(embed))
+    question = "Who purchased recently?"
+    proposal = agent.propose(question, "session", "test-model")
+    schema = database.schema()
     assert proposal["retrieval_mode"] == "hybrid"
-    assert set(proposal["tables"]) == {
-        "orders",
-        "customers",
-        "items",
-        "unrelated_a",
-        "unrelated_b",
-        "unrelated_c",
-    }
-    assert any("CREATE VIEW customer_names" in text for text in embedded)
-    order_document = next(text for text in embedded if "CREATE TABLE orders " in text)
-    assert "foreign_keys" in order_document and "customer_id" in order_document
-    assert "customers" in order_document
+    assert proposal["tables"] == [table["name"] for table in schema]
+    assert contexts[-1]["schema"] == [table["sql"] for table in schema]
+    assert len(schema) == 7
+    assert any("CREATE VIEW customer_names" in ddl for ddl in contexts[-1]["schema"])
+    assert any("REFERENCES customers(id)" in ddl for ddl in contexts[-1]["schema"])
+    assert batches == [[question, previous_question]]
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("ALTER TABLE unrelated_c ADD COLUMN note TEXT")
+    agent.propose(question, "session", "test-model")
+    assert contexts[-1]["schema"] == [table["sql"] for table in database.schema()]
+    assert any("note TEXT" in ddl for ddl in contexts[-1]["schema"])
+    assert not any("note TEXT" in ddl for ddl in contexts[0]["schema"])
+    assert batches == [[question, previous_question]]
+
+
+def test_empty_history_sends_full_schema_without_retrieval(tmp_path, monkeypatch):
+    database = load_database("s01_retail", tmp_path)
+    history = History(tmp_path / "history.db", dataset=str(database.path))
+    retriever = Retriever()
+    monkeypatch.setattr(
+        retriever, "prepare", lambda *_: pytest.fail("No history to embed")
+    )
+    monkeypatch.setattr(retriever, "rank", lambda *_: pytest.fail("No history to rank"))
+    contexts = []
+
+    def complete(model, messages):
+        contexts.append(json.loads(messages[1]["content"]))
+        return {"sql": "SELECT 1", "explanation": "One."}
+
+    proposal = SQLAgent(
+        database, history, complete=complete, retriever=retriever
+    ).propose("List customers", "session", "test-model")
+    assert proposal["retrieval_mode"] == "none"
+    assert proposal["examples"] == []
+    assert contexts[0]["schema"] == [table["sql"] for table in database.schema()]
 
 
 def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
@@ -263,7 +282,8 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
     assert {item["question"] for item in candidates} <= embedded
     assert "Archive question 000" not in embedded
     assert not any(
-        "SQL_TEXT_MARKER" in text
+        "CREATE TABLE" in text
+        or "SQL_TEXT_MARKER" in text
         or "FAILED_QUESTION" in text
         or "OTHER_DATABASE_QUESTION" in text
         for text in embedded

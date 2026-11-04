@@ -272,7 +272,7 @@ def test_terminal_shows_sql_then_executes_only_after_yes(agent, monkeypatch, cap
     def approve(prompt=""):
         output = capsys.readouterr().out
         assert "SELECT name FROM customers" in output
-        assert "Retrieval: keyword" in output
+        assert "History retrieval: none" in output
         assert executions == []
         assert agent.history.successful() == []
         return "yes"

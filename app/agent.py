@@ -76,32 +76,18 @@ class SQLAgent:
         query = " ".join(
             [state["question"], *(item["question"] for item in memory[-2:])]
         )
-        schema_texts = [json.dumps(table, sort_keys=True) for table in schema]
         history_texts = [item["question"] for item in history]
-        hybrid = self.retriever.prepare([query, *schema_texts, *history_texts])
-        # Prior SQL supplies table names locally, without being sent for embedding.
-        schema_query = query + " " + " ".join(item["sql"] for item in memory[-2:])
-        selected = [
-            schema[i]
-            for i in self.retriever.rank(
-                schema_query, schema_texts, 4, semantic_query=query
-            )
-        ] or schema
-        names = {table["name"] for table in selected}
-        neighbors = set(names)
-        for table in schema:
-            if table["name"] in names or any(
-                key["table"] in names for key in table["foreign_keys"]
-            ):
-                neighbors.add(table["name"])
-                neighbors.update(key["table"] for key in table["foreign_keys"])
-        selected = [table for table in schema if table["name"] in neighbors]
-        examples = [history[i] for i in self.retriever.rank(query, history_texts, 3)]
-        examples = [
-            {"question": item["question"], "sql": item["sql"]} for item in examples
-        ]
+        examples = []
+        retrieval_mode = "none"
+        if history:
+            hybrid = self.retriever.prepare([query, *history_texts])
+            retrieval_mode = "hybrid" if hybrid else "keyword"
+            examples = [
+                {"question": history[i]["question"], "sql": history[i]["sql"]}
+                for i in self.retriever.rank(query, history_texts, 3)
+            ]
         context = {
-            "schema": [table["sql"] for table in selected],
+            "schema": [table["sql"] for table in schema],
             "successful_examples": examples,
             "conversation": [
                 {"question": item["question"], "sql": item["sql"]} for item in memory
@@ -116,9 +102,9 @@ class SQLAgent:
             "Add a sensible LIMIT to detail listings. Do not claim to have executed the query."
         )
         return {
-            "tables": [table["name"] for table in selected],
+            "tables": [table["name"] for table in schema],
             "examples": examples,
-            "retrieval_mode": "hybrid" if hybrid else "keyword",
+            "retrieval_mode": retrieval_mode,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(context)},

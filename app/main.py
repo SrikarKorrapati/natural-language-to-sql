@@ -41,7 +41,7 @@ def run_question(agent: SQLAgent, question: str, session_id: str, model: str) ->
     sql = proposal["sql"]
     print(f"\n{proposal['explanation']}\n\n{sql}")
     print(f"\nAttempts: {proposal['attempts']}")
-    print(f"Retrieval: {proposal['retrieval_mode']}")
+    print(f"History retrieval: {proposal['retrieval_mode']}")
     if proposal["validation_error"]:
         print(f"Validation error: {proposal['validation_error']}")
 

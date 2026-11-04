@@ -1,4 +1,4 @@
-"""Keyword and semantic retrieval with process-local embedding reuse."""
+"""Equal-weight keyword and semantic retrieval for successful past questions."""
 
 import math
 import os
@@ -41,7 +41,7 @@ class Retriever:
         self.cache = {}
 
     def prepare(self, texts: list[str]) -> bool:
-        """Embed only new text, before either schema or history rankings are computed."""
+        """Embed only new question text before ranking historical queries."""
         if self.embed is None:
             return False
         missing = list(dict.fromkeys(text for text in texts if text not in self.cache))
@@ -73,14 +73,12 @@ class Retriever:
             return False
         return True
 
-    def rank(self, query, texts, limit, semantic_query=None):
-        """Fuse positions in each ranking, never keyword and cosine scores directly."""
+    def rank(self, query, texts, limit):
+        """Give keyword and semantic ranks equal weight with reciprocal rank fusion."""
         keyword = keyword_rank(query, texts)
         if self.embed is None or not texts:
             return keyword[:limit]
-        query_vector = self.cache[
-            semantic_query if semantic_query is not None else query
-        ]
+        query_vector = self.cache[query]
         similarities = [
             sum(a * b for a, b in zip(query_vector, self.cache[text])) for text in texts
         ]
