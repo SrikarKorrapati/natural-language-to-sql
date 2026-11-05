@@ -35,11 +35,11 @@ Configure embeddings in your environment or `.env`:
 | `EMBEDDING_BASE_URL` | `OPENAI_BASE_URL`, otherwise `https://api.openai.com/v1` | OpenAI-compatible embedding endpoint |
 | `EMBEDDING_API_KEY` | `OPENAI_API_KEY` | Credential for that endpoint |
 
-A chat-compatible provider may not support embeddings. Set `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` to a separate provider when needed. The endpoint must support the [embeddings API](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create). An embedding failure prints a clear message and switches to keyword-only retrieval for the rest of the process. Restart after fixing the configuration to retry embeddings. Each proposal reports the history retrieval mode actually used. With no successful history, it reports `none` and makes no embedding requests.
+A chat-compatible provider may not support embeddings. Set `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` to a separate provider when needed. The endpoint must support the [embeddings API](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create). An embedding failure prints a clear message and uses keyword-only retrieval for that question. Later searches attempt embeddings again. Each proposal reports the history retrieval mode actually used. With no successful history, it reports `none` and makes no embedding requests.
 
 Every question receives the full current schema: all table and view DDL, including declared foreign keys. Historical retrieval searches the question text of the latest **200 successful queries from the same database**, selecting up to **three examples** before including their SQL in the model prompt.
 
-Embeddings are cached in process memory by provider configuration and text. Unchanged question text reuses its vector; new history questions are embedded as needed. The cache is shared across agent instances and cleared when the process exits. No vector database is needed.
+Each hybrid history search requests fresh embeddings for its search text and all candidate questions, even when the text is unchanged. Vectors are discarded after ranking, and each agent gets its own retriever. No vector database is needed.
 
 ## Terminal workflow
 
@@ -82,8 +82,8 @@ python -m pytest -q -p no:cacheprovider
 
 ## Privacy
 
-When successful history exists, the **embedding provider** receives question text only: the current question with the last two successful question texts for follow-up context, plus up to 200 candidate historical questions from the same database. Schema and historical SQL are not embedded. Cached text is sent again only when an embedding is needed.
+In hybrid mode, when successful history exists, the **embedding provider** receives question text only: the current question with the last two successful question texts for follow-up context, plus up to 200 candidate historical questions from the same database. These texts are sent on every search, including repeated questions. Schema and historical SQL are not embedded. Keyword mode makes no embedding requests.
 
 The **chat provider** receives the current question, the full current schema, up to six successful conversation turns with their SQL, and up to three retrieved question/SQL examples. These providers may be different when separate embedding settings are used.
 
-Result rows stay local. `.env` and source databases are excluded from Git. Conversation history in `data/history.db` can be committed to Git, including saved questions, SQL, and source database paths. Embedding vectors remain in process memory.
+Result rows stay local. `.env` and source databases are excluded from Git. Conversation history in `data/history.db` can be committed to Git, including saved questions, SQL, and source database paths. Embedding vectors exist only while the current search is being ranked.
