@@ -12,6 +12,7 @@ from benchmarks.run import load_database
 
 @pytest.fixture(autouse=True)
 def keyword_retrieval(monkeypatch):
+    # Keep core behavior tests offline; semantic retrieval has separate tests.
     monkeypatch.setenv("RETRIEVAL_MODE", "keyword")
 
 
@@ -47,6 +48,7 @@ def test_select_and_cte_with_comments(source):
     ],
 )
 def test_read_only_boundary_rejects_unsafe_statements(source, sql):
+    # Test both entry points and confirm rejected SQL leaves the source unchanged.
     before = source.execute("SELECT id, name, region FROM customers ORDER BY id")[
         "rows"
     ]
@@ -67,6 +69,7 @@ def test_result_limit_is_reported_without_changing_aggregate(source):
     assert [row[0] for row in result["rows"]] == [1, 2, 3]
     assert result["row_count"] == 3
     assert result["truncated"] is True
+    # The cap limits returned rows, not how many source rows an aggregate can count.
     total = limited.execute("SELECT COUNT(*) FROM customers")
     assert total["rows"][0][0] == expected_count
     assert total["truncated"] is False
@@ -140,6 +143,7 @@ def test_graph_has_a_finite_repair_budget(source, history, max_repairs):
     result = SQLAgent(
         source, history, complete=complete, max_repairs=max_repairs
     ).propose("List customers", "session-one", "test-model")
+    # Corrections are additional to the initial generation attempt.
     assert len(calls) == max_repairs + 1
     assert result["attempts"] == max_repairs + 1
     assert result["validation_error"]
@@ -181,6 +185,7 @@ def test_model_adapter_uses_json_chat_completion(monkeypatch):
             },
         )
 
+    # Use the real SDK with a fake HTTP response to check request serialization.
     def client(**kwargs):
         return OpenAI(
             api_key="test-only",
@@ -222,6 +227,7 @@ def test_follow_up_receives_only_approved_conversation_context(source, history):
         }
 
     agent = SQLAgent(source, history, complete=complete)
+    # Generating a proposal alone must not add it to later conversation context.
     agent.propose("UNAPPROVED_MARKER", "session-one", "test-model")
     agent.propose("Now only North", "session-one", "test-model")
     assert "Show customer names and regions" in prompts[-1]
@@ -269,6 +275,7 @@ def test_terminal_shows_sql_then_executes_only_after_yes(agent, monkeypatch, cap
         executions.append(sql)
         return execute(sql)
 
+    # Inspect the moment approval is requested: SQL is visible but has not run.
     def approve(prompt=""):
         output = capsys.readouterr().out
         assert "SELECT name FROM customers" in output
@@ -290,6 +297,7 @@ def test_terminal_edit_requires_fresh_approval(agent, monkeypatch, capsys, appro
     from app.main import run_question
 
     edited = "SELECT name FROM customers WHERE region = 'North' ORDER BY name"
+    # A blank line finishes the edit; the final reply approves or rejects that SQL.
     answers = iter(["edit", edited, "", approval])
     executions = []
     execute = agent.database.execute
@@ -320,6 +328,7 @@ def test_terminal_does_not_remember_failed_execution(agent, monkeypatch):
     from app.main import run_question
 
     before = agent.database.execute("SELECT COUNT(*) FROM customers")["rows"]
+    # Approval cannot bypass SQLite's read-only checks, even for manually edited SQL.
     answers = iter(["edit", "DELETE FROM customers", "", "yes", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     with pytest.raises(sqlite3.Error):

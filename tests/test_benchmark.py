@@ -20,6 +20,7 @@ def test_result_comparison_respects_duplicates_order_and_float_tolerance():
 
 
 def test_ambiguous_float_matches_do_not_depend_on_row_order():
+    # The first actual row matches both expected rows; the second matches only the first.
     assert rows_equal([[1.0000009], [1.0]], [[1.0000001], [1.0000018]])
 
 
@@ -32,11 +33,13 @@ def test_runner_switches_schemas_and_keeps_failures(tmp_path, monkeypatch):
 
     class FakeAgent:
         def __init__(self, database, history):
+            # Write a marker so the next case detects any accidental sharing of history.
             assert history.successful() == []
             history.save("benchmark", "previous question", "test-model", "SELECT 1")
 
         def propose(self, question, session_id, model):
             queries = {
+                # Changed SQL and column aliases can still produce the correct answer.
                 "equivalent": "SELECT value AS alternate_name FROM numbers",
                 "wrong": "SELECT 2",
                 "invalid": "SELECT missing_column",
@@ -101,6 +104,7 @@ def test_reference_queries_execute_on_all_twenty_schemas(tmp_path):
         database = load_database(case["schema_id"], tmp_path)
         database.validate(case["expected_sql"])
         result = database.execute(case["expected_sql"])
+        # Saved reference results detect changes to fixture data or expected SQL behavior.
         assert not result["truncated"], case["id"]
         assert result["columns"] == expected[case["id"]]["columns"], case["id"]
         assert rows_equal(

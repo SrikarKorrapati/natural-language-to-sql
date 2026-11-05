@@ -23,8 +23,10 @@ def load_database(schema_id, directory):
     path = Path(directory) / f"{schema_id}.db"
     if not path.exists():
         with closing(sqlite3.connect(path)) as connection:
+            # Each fixture defines its tables and inserts the same sample rows every run.
             connection.execute("PRAGMA foreign_keys = ON")
             connection.executescript((SCHEMAS / f"{schema_id}.sql").read_text())
+    # Subsequent queries use the application's read-only database connection.
     return Database(path)
 
 
@@ -35,6 +37,7 @@ def rows_equal(actual, expected, ordered=False):
         if isinstance(left, int) and isinstance(right, int):
             return left == right
         if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            # A fixed tolerance avoids allowing larger errors for larger numbers.
             return math.isclose(left, right, rel_tol=0, abs_tol=1e-6)
         return left == right
 
@@ -44,10 +47,11 @@ def rows_equal(actual, expected, ordered=False):
     if len(actual) != len(expected):
         return False
     if ordered:
+        # Ordering matters only for cases whose requested answer depends on it.
         return all(map(row_equal, actual, expected))
 
-    # A matching, rather than a set, keeps duplicate rows significant. Backtracking
-    # also handles multiple nearby floating-point values without greedy mismatches.
+    # Pair each actual row with a different expected row, preserving duplicate counts.
+    # Reassign earlier pairs when nearby floating-point values have multiple matches.
     matches = {}
 
     def match(index, seen):
@@ -66,6 +70,7 @@ def run(models, cases, agent_factory=SQLAgent):
     """Each case starts with empty memory; expected SQL never enters the agent."""
     report = {"created_at": datetime.now(timezone.utc).isoformat(), "models": {}}
 
+    # Fixtures and history are temporary, keeping benchmarks separate from user data.
     with tempfile.TemporaryDirectory(prefix="queryroom-benchmark-") as directory:
         root = Path(directory)
         for model_index, model in enumerate(dict.fromkeys(models)):
@@ -75,6 +80,7 @@ def run(models, cases, agent_factory=SQLAgent):
                 expected = database.execute(case["expected_sql"])
                 if expected["truncated"]:
                     raise ValueError(f"Reference result is truncated: {case['id']}")
+                # Fresh history for each model/case prevents earlier answers leaking in.
                 history = History(
                     root / f"memory-{model_index}-{case_index}.db",
                     dataset=str(database.path),
@@ -91,6 +97,7 @@ def run(models, cases, agent_factory=SQLAgent):
                     "retrieval_mode": None,
                     "error": None,
                 }
+                # Time generation, corrections, validation, and execution; exclude setup.
                 started = perf_counter()
                 try:
                     proposal = agent.propose(case["question"], "benchmark", model)
@@ -101,9 +108,11 @@ def run(models, cases, agent_factory=SQLAgent):
                     )
                     database.validate(proposal["sql"])
                     result["valid_sql"] = True
+                    # Benchmark fixtures run automatically without terminal approval.
                     actual = database.execute(proposal["sql"])
                     if actual["truncated"]:
                         raise ValueError("Generated result is truncated.")
+                    # Compare values and column counts, allowing different SQL and aliases.
                     result["correct"] = len(actual["columns"]) == len(
                         expected["columns"]
                     ) and rows_equal(
@@ -112,9 +121,11 @@ def run(models, cases, agent_factory=SQLAgent):
                         case.get("order_sensitive", False),
                     )
                 except Exception as exc:
+                    # Record the error and continue, keeping failures in the final report.
                     result["error"] = str(exc)
                 result["latency_ms"] = round((perf_counter() - started) * 1000, 2)
                 results.append(result)
+            # Valid SQL can answer incorrectly, so report validity and accuracy.
             report["models"][model] = {
                 "cases": len(results),
                 "execution_accuracy": sum(r["correct"] for r in results) / len(results),

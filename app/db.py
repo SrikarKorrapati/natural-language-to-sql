@@ -10,16 +10,21 @@ from uuid import uuid4
 
 
 class Database:
+    """Inspect and query an existing SQLite database without allowing changes."""
+
     def __init__(self, path: Path, max_rows: int = 500, timeout_seconds: float = 3):
         self.path = Path(path).resolve()
         self.max_rows = max_rows
         self.timeout_seconds = timeout_seconds
 
     def connect(self):
+        # URI read-only mode also prevents accidentally creating a missing database.
         return sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=3)
 
     def schema(self) -> list[dict]:
+        """Read all table/view definitions, preserving declared key relationships."""
         with closing(self.connect()) as conn:
+            # sqlite_master stores each table or view's CREATE statement.
             tables = conn.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') "
                 "AND name NOT LIKE 'sqlite_%' ORDER BY name"
@@ -28,6 +33,7 @@ class Database:
 
     @staticmethod
     def authorize(action, arg1, arg2, database, trigger):
+        """Let SQLite reject operations outside the permitted read-only actions."""
         allowed = {
             sqlite3.SQLITE_SELECT,
             sqlite3.SQLITE_READ,
@@ -36,6 +42,7 @@ class Database:
         }
         if action not in allowed:
             return sqlite3.SQLITE_DENY
+        # A SELECT can still call functions that access files or allocate large blobs.
         if action == sqlite3.SQLITE_FUNCTION and (arg2 or "").lower() in {
             "load_extension",
             "readfile",
@@ -50,17 +57,21 @@ class Database:
     def _run(self, sql: str, validate: bool = False) -> dict:
         started = time.perf_counter()
         with closing(self.connect()) as conn:
+            # Apply read-only rules and size limits to validation and execution alike.
             conn.execute("PRAGMA query_only = ON")
             conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, 2_000_000)
             conn.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH, 50_000)
             conn.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 0)
             conn.set_authorizer(self.authorize)
+            # SQLite checks the elapsed time every 1,000 virtual-machine instructions.
             conn.set_progress_handler(
                 lambda: time.perf_counter() - started > self.timeout_seconds, 1000
             )
+            # EXPLAIN compiles the query for validation without running it for results.
             cursor = conn.execute(("EXPLAIN " if validate else "") + sql)
             if validate:
                 return {}
+            # Fetch one extra row to detect truncation without loading every result.
             rows = cursor.fetchmany(self.max_rows + 1)
             return {
                 "columns": [column[0] for column in cursor.description],
@@ -78,7 +89,10 @@ class Database:
 
 
 class History:
+    """Persist successful question/SQL pairs separately from the source database."""
+
     def __init__(self, path: Path, dataset: str):
+        # The caller uses the source database's absolute path as its dataset identifier.
         self.path, self.dataset = Path(path), dataset
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path)) as conn, conn:
@@ -96,8 +110,10 @@ class History:
             """)
 
     def _read(self, where: str, params: tuple, limit: int = 200) -> list[dict]:
+        """Read this database's newest records, optionally filtered by session."""
         with closing(sqlite3.connect(self.path)) as conn:
             conn.row_factory = sqlite3.Row
+            # LIMIT caps this read; older history rows remain stored.
             rows = conn.execute(
                 f"SELECT * FROM queries WHERE dataset = ? AND {where} "
                 "ORDER BY created_at DESC, rowid DESC LIMIT ?",
@@ -106,6 +122,8 @@ class History:
             return [dict(row) for row in rows]
 
     def recent(self, session_id: str, limit: int = 6) -> list[dict]:
+        """Return recent successful turns in this session, oldest to newest."""
+        # Read the newest turns first, then reverse them into conversation order.
         return list(
             reversed(
                 self._read(
@@ -115,6 +133,7 @@ class History:
         )
 
     def successful(self, limit: int = 200) -> list[dict]:
+        """Provide retrieval candidates across sessions for this database only."""
         return self._read("status = 'success'", (), limit)
 
     def save(self, session_id: str, question: str, model: str, sql: str) -> None:
