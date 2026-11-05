@@ -60,6 +60,8 @@ LangGraph runs **retrieve → generate → validate**, returning invalid SQL to 
 
 See the [detailed SQL agent flow](docs/sql-agent-flow.md) for the graph, retry path, shared state, and post-graph approval step.
 
+![SQL agent flow from question retrieval through SQL validation, repair, approval, and execution](docs/sql-agent-flow.png)
+
 Memory includes the last six approved, successful turns in the conversation. Historical retrieval uses successful queries from the same database. Both persist in `data/history.db`. Source databases open read-only, with a three-second execution limit and a 500-row result cap.
 
 ## Benchmark models
