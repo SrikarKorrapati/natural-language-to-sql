@@ -86,4 +86,4 @@ When successful history exists, the **embedding provider** receives question tex
 
 The **chat provider** receives the current question, the full current schema, up to six successful conversation turns with their SQL, and up to three retrieved question/SQL examples. These providers may be different when separate embedding settings are used.
 
-Result rows stay local. `.env`, databases, and conversation history are excluded from Git. Embedding vectors remain in process memory.
+Result rows stay local. `.env` and source databases are excluded from Git. Conversation history in `data/history.db` can be committed to Git, including saved questions, SQL, and source database paths. Embedding vectors remain in process memory.
