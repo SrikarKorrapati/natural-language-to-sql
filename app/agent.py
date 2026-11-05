@@ -22,17 +22,19 @@ def model_completion(model: str, messages: list[dict]) -> dict:
 
 
 class State(TypedDict, total=False):
-    question: str
-    session_id: str
-    model: str
-    messages: list[dict]
-    tables: list[str]
-    examples: list[dict]
-    retrieval_mode: str
-    sql: str
-    explanation: str
-    attempts: int
-    validation_error: str | None
+    """Shared graph state; fields are filled as each step runs."""
+
+    question: str  # User's current natural-language question.
+    session_id: str  # Conversation identifier used to load session memory.
+    model: str  # Chat model used to generate and correct SQL.
+    messages: list[dict]  # Base chat prompt with schema, history, and question.
+    tables: list[str]  # All table and view names included in the schema.
+    examples: list[dict]  # Up to three retrieved successful question/SQL pairs.
+    retrieval_mode: str  # History search used: "hybrid", "keyword", or "none".
+    sql: str  # Latest proposed SQL query.
+    explanation: str  # Model's explanation and assumptions for the SQL.
+    attempts: int  # Generation count, including the first proposal and corrections.
+    validation_error: str | None  # Latest validation error; None if none is recorded.
 
 
 class SQLAgent:
