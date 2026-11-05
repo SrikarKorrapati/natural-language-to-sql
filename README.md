@@ -58,6 +58,8 @@ Enter `y` to execute, press Enter to skip, or enter `edit` to replace the SQL. F
 
 LangGraph runs **retrieve → generate → validate**, returning invalid SQL to the model for up to **five correction attempts** after the first proposal. Set `SQL_MAX_REPAIRS` to change that limit. Validation uses SQLite `EXPLAIN`; execution requires approval in the terminal. If validation still fails, edit or skip the final proposal.
 
+See the [detailed SQL agent flow](docs/sql-agent-flow.md) for the graph, retry path, shared state, and post-graph approval step.
+
 Memory includes the last six approved, successful turns in the conversation. Historical retrieval uses successful queries from the same database. Both persist in `data/history.db`. Source databases open read-only, with a three-second execution limit and a 500-row result cap.
 
 ## Benchmark models
