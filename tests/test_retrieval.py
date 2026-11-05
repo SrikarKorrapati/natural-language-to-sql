@@ -1,4 +1,4 @@
-"""Offline tests for hybrid ranking, embedding reuse, fallback, and history scope."""
+"""Offline tests for hybrid ranking, fresh embeddings, fallback, and history scope."""
 
 import json
 import sqlite3
@@ -26,10 +26,9 @@ def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
     }
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
     assert keyword_rank(query, documents) == [0, 1]
-    assert retriever.prepare([query, *documents])
     # Keyword order is 0, 1; semantic order is 2, 1, 0, 3.
     # RRF puts 0 just ahead of 1 and includes the semantic-only synonym 2.
-    assert retriever.rank(query, documents, 3) == [0, 1, 2]
+    assert retriever.rank(query, documents, 3) == ([0, 1, 2], "hybrid")
 
 
 def test_equal_rank_weights_balance_opposite_rankings():
@@ -38,9 +37,8 @@ def test_equal_rank_weights_balance_opposite_rankings():
     vectors = {query: [1, 0], documents[0]: [1, 0], documents[1]: [0, 1]}
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
     assert keyword_rank(query, documents) == [1, 0]
-    retriever.prepare([query, *documents])
     # Opposite first/second ranks contribute equally; input order breaks the tie.
-    assert retriever.rank(query, documents, 2) == [0, 1]
+    assert retriever.rank(query, documents, 2) == ([0, 1], "hybrid")
 
 
 def test_semantic_search_finds_synonyms_and_uses_cosine_similarity():
@@ -48,11 +46,10 @@ def test_semantic_search_finds_synonyms_and_uses_cosine_similarity():
     vectors = {"buyers": [1, 0], "customers": [3, 0], "products": [100, 100]}
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
     assert keyword_rank("buyers", ["customers", "products"]) == []
-    retriever.prepare(list(vectors))
-    assert retriever.rank("buyers", ["customers", "products"], 1) == [0]
+    assert retriever.rank("buyers", ["customers", "products"], 1) == ([0], "hybrid")
 
 
-def test_cache_embeds_only_new_or_changed_text():
+def test_every_search_embeds_the_query_and_all_history_questions():
     batches = []
 
     def embed(texts):
@@ -60,20 +57,37 @@ def test_cache_embeds_only_new_or_changed_text():
         return [[1, 2] for _ in texts]
 
     retriever = Retriever(embed)
-    initial = ["question", "List customers", "past question"]
-    # Repeated text is deduplicated within a batch and reused across later batches.
-    assert retriever.prepare([*initial, "past question"])
-    assert retriever.prepare(initial)
-    assert retriever.prepare([*initial, "new history question"])
-    assert retriever.prepare(["question", "List customer names"])
+    documents = ["List customers", "past question", "past question"]
+    # Identical searches still request every vector, including repeated question text.
+    assert retriever.rank("question", documents, 3)[1] == "hybrid"
+    assert retriever.rank("question", documents, 3)[1] == "hybrid"
+    assert (
+        retriever.rank("question", [*documents, "new history question"], 3)[1]
+        == "hybrid"
+    )
+    assert retriever.rank("changed question", documents, 3)[1] == "hybrid"
     assert batches == [
-        initial,
-        ["new history question"],
-        ["List customer names"],
+        ["question", *documents],
+        ["question", *documents],
+        ["question", *documents, "new history question"],
+        ["changed question", *documents],
     ]
 
 
-def test_embedding_failure_falls_back_clearly_and_does_not_repeat(capsys):
+def test_every_search_uses_its_own_vectors_and_dimensions():
+    responses = iter(
+        [
+            [[1, 0], [1, 0], [0, 1]],
+            [[1, 0, 0], [0, 1, 0], [1, 0, 0]],
+        ]
+    )
+    retriever = Retriever(lambda texts: next(responses))
+    # The same question can get different vectors; only the current response is used.
+    assert retriever.rank("buyers", ["customers", "products"], 1) == ([0], "hybrid")
+    assert retriever.rank("buyers", ["customers", "products"], 1) == ([1], "hybrid")
+
+
+def test_embedding_failure_falls_back_clearly_for_each_question(capsys):
     calls = []
 
     def unavailable(texts):
@@ -82,26 +96,52 @@ def test_embedding_failure_falls_back_clearly_and_does_not_repeat(capsys):
 
     retriever = Retriever(unavailable)
     documents = ["customers in the North", "shipping rates", "customers in the South"]
-    assert not retriever.prepare(["customers", *documents])
+    assert retriever.rank("customers", documents, 3) == ([0, 2], "keyword")
     message = capsys.readouterr().err.lower()
     assert "keyword" in message and "runtimeerror" in message
     assert "provider detail" not in message
-    assert retriever.rank("customers", documents, 3) == [0, 2]
-    assert not retriever.prepare(["customers", *documents])
-    assert len(calls) == 1
+    assert retriever.rank("customers", documents, 3) == ([0, 2], "keyword")
+    assert "keyword-only" in capsys.readouterr().err
+    assert calls == [["customers", *documents], ["customers", *documents]]
 
 
-# Cover a zero vector, the wrong response count, and a non-finite vector.
-@pytest.mark.parametrize("vectors", [[[0, 0]], [[1, 0], [1, 0]], [[float("nan"), 1]]])
+def test_embeddings_can_recover_on_the_next_question(capsys):
+    calls = []
+
+    def embed(texts):
+        calls.append(list(texts))
+        if len(calls) == 1:
+            raise RuntimeError("Temporarily unavailable")
+        return [[1, 0], [1, 0], [0, 1]]
+
+    retriever = Retriever(embed)
+    assert retriever.rank("buyers", ["customers", "products"], 1) == ([], "keyword")
+    assert "keyword-only" in capsys.readouterr().err
+    assert retriever.rank("buyers", ["customers", "products"], 1) == ([0], "hybrid")
+    assert capsys.readouterr().err == ""
+    assert len(calls) == 2
+
+
+# Each malformed response is rejected before semantic ranking can use its vectors.
+@pytest.mark.parametrize(
+    "vectors",
+    [
+        [[0, 0], [1, 0]],
+        [[1, 0]],
+        [[1, 0], [1, 0], [1, 0]],
+        [[float("nan"), 1], [1, 0]],
+        [[1, 0], [1, 0, 0]],
+        [],
+    ],
+)
 def test_invalid_embedding_response_uses_keyword_fallback(vectors, capsys):
     retriever = Retriever(lambda texts: vectors)
-    assert not retriever.prepare(["customers"])
-    assert retriever.rank("customers", ["customers"], 1) == [0]
+    assert retriever.rank("customers", ["customers"], 1) == ([0], "keyword")
     assert "keyword-only" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("separate_provider", [False, True])
-def test_embedding_provider_configuration_and_process_cache(
+def test_embedding_provider_configuration_and_independent_retrievers(
     monkeypatch, separate_provider
 ):
     import app.retrieval as retrieval_module
@@ -120,13 +160,14 @@ def test_embedding_provider_configuration_and_process_cache(
     def respond(request):
         requests.append(request)
         inputs = json.loads(request.content)["input"]
+        vectors = [[1, 0], [0, 1], [-1, 0], [1, 1]]
         return httpx.Response(
             200,
             json={
                 "object": "list",
                 "model": "configured-model",
                 "data": [
-                    {"object": "embedding", "index": i, "embedding": [i + 1, 1]}
+                    {"object": "embedding", "index": i, "embedding": vectors[i]}
                     for i in reversed(range(len(inputs)))
                 ],
                 "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
@@ -140,13 +181,18 @@ def test_embedding_provider_configuration_and_process_cache(
 
     monkeypatch.setattr(retrieval_module, "OpenAI", client)
     first = configured_retriever()
-    assert first.prepare(["provider configuration query", "past customer question"])
-    second = configured_retriever()
-    assert second is first
-    assert second.prepare(["provider configuration query", "past customer question"])
-    assert len(requests) == 1
+    documents = ["inventory", "shipping", "customers"]
     # API indexes associate inputs with vectors even when response rows are reversed.
-    assert first.cache["provider configuration query"] == pytest.approx([2**-0.5] * 2)
+    assert first.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
+    assert first.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
+    second = configured_retriever()
+    assert second is not first
+    assert second.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
+    assert len(requests) == 3
+    assert all(
+        json.loads(request.content)["input"] == ["buyers", *documents]
+        for request in requests
+    )
     request = requests[0]
     assert request.url.host == ("vectors.test" if separate_provider else "chat.test")
     assert request.url.path == "/v1/embeddings"
@@ -158,7 +204,10 @@ def test_embedding_provider_configuration_and_process_cache(
     )
     assert body["encoding_format"] == "float"
     monkeypatch.setenv("EMBEDDING_MODEL", "another-model")
-    assert configured_retriever() is not first
+    third = configured_retriever()
+    assert third is not first
+    assert third.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
+    assert json.loads(requests[-1].content)["model"] == "another-model"
 
 
 def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
@@ -171,8 +220,12 @@ def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
         lambda **kwargs: pytest.fail("Unexpected provider call"),
     )
     retriever = configured_retriever()
-    assert not retriever.prepare(["customers", "orders"])
-    assert retriever.rank("customers", ["customers", "orders"], 2) == [0]
+    assert retriever.rank("customers", ["customers", "orders"], 2) == ([0], "keyword")
+
+
+def test_empty_candidates_do_not_request_embeddings():
+    retriever = Retriever(lambda texts: pytest.fail("No history to embed"))
+    assert retriever.rank("customers", [], 3) == ([], "none")
 
 
 def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path):
@@ -214,23 +267,20 @@ def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path
     assert any("REFERENCES customers(id)" in ddl for ddl in contexts[-1]["schema"])
     assert batches == [[question, previous_question]]
 
-    # Schema changes must appear even when the query and history embeddings are cached.
+    # Repeated questions still load the current schema and request fresh embeddings.
     with sqlite3.connect(path) as connection:
         connection.execute("ALTER TABLE unrelated_c ADD COLUMN note TEXT")
     agent.propose(question, "session", "test-model")
     assert contexts[-1]["schema"] == [table["sql"] for table in database.schema()]
     assert any("note TEXT" in ddl for ddl in contexts[-1]["schema"])
     assert not any("note TEXT" in ddl for ddl in contexts[0]["schema"])
-    assert batches == [[question, previous_question]]
+    assert batches == [[question, previous_question], [question, previous_question]]
 
 
 def test_empty_history_sends_full_schema_without_retrieval(tmp_path, monkeypatch):
     database = load_database("s01_retail", tmp_path)
     history = History(tmp_path / "history.db", dataset=str(database.path))
     retriever = Retriever()
-    monkeypatch.setattr(
-        retriever, "prepare", lambda *_: pytest.fail("No history to embed")
-    )
     monkeypatch.setattr(retriever, "rank", lambda *_: pytest.fail("No history to rank"))
     contexts = []
 
@@ -246,7 +296,7 @@ def test_empty_history_sends_full_schema_without_retrieval(tmp_path, monkeypatch
     assert contexts[0]["schema"] == [table["sql"] for table in database.schema()]
 
 
-def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
+def test_history_scope_limits_question_only_embeddings_and_updated_candidates(
     tmp_path,
 ):
     source = load_database("s01_retail", tmp_path)
@@ -307,9 +357,15 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
     history.save(
         "archive", "Fresh receipt question", "test", "SELECT 42 AS SQL_TEXT_MARKER"
     )
-    # The same search reuses its cache and embeds only the newly saved question.
+    # A new history entry changes the candidate pool; all current candidates are sent.
     agent.propose("Customer spending", "session", "test-model")
-    assert batches[-1] == ["Fresh receipt question"]
+    assert len(batches) == 2
+    assert batches[-1] == [
+        "Customer spending Session question 6 Session question 7",
+        *(item["question"] for item in history.successful()),
+    ]
+    assert len(batches[-1]) == 201
+    assert "Fresh receipt question" in batches[-1]
 
 
 def test_chat_only_provider_reports_keyword_mode_without_changing_endpoint(
@@ -355,5 +411,8 @@ def test_chat_only_provider_reports_keyword_mode_without_changing_endpoint(
     assert (
         agent.propose("List products", "session", "test")["retrieval_mode"] == "keyword"
     )
-    assert len(requests) == 1
-    assert str(requests[0].url) == "https://chat-only.test/v1/embeddings"
+    assert len(requests) == 2
+    assert all(
+        str(request.url) == "https://chat-only.test/v1/embeddings"
+        for request in requests
+    )

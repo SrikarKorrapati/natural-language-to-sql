@@ -88,13 +88,11 @@ class SQLAgent:
         examples = []
         retrieval_mode = "none"
         if history:
-            # Embed question text only, reusing cached vectors when available.
-            hybrid = self.retriever.prepare([query, *history_texts])
-            retrieval_mode = "hybrid" if hybrid else "keyword"
-            # Ranked positions map back to the question and its successful SQL.
+            # Rank question text first, then use its indexes to attach successful SQL.
+            indexes, retrieval_mode = self.retriever.rank(query, history_texts, 3)
             examples = [
                 {"question": history[i]["question"], "sql": history[i]["sql"]}
-                for i in self.retriever.rank(query, history_texts, 3)
+                for i in indexes
             ]
         context = {
             # Full CREATE statements preserve columns, primary keys, and foreign keys.
