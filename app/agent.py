@@ -13,6 +13,7 @@ from app.retrieval import configured_retriever
 
 
 def model_completion(model: str, messages: list[dict]) -> dict:
+    """Ask the chat provider for SQL and an explanation as a JSON object."""
     # Compatible providers can be selected through OPENAI_BASE_URL.
     with OpenAI(timeout=45, max_retries=0) as client:
         result = client.chat.completions.create(
@@ -22,17 +23,19 @@ def model_completion(model: str, messages: list[dict]) -> dict:
 
 
 class State(TypedDict, total=False):
+    """Shared graph data; total=False lets steps add fields as they run."""
+
     question: str
     session_id: str
     model: str
-    messages: list[dict]
-    tables: list[str]
-    examples: list[dict]
-    retrieval_mode: str
+    messages: list[dict]  # Base prompt, before any correction messages.
+    tables: list[str]  # Every table and view supplied in the schema.
+    examples: list[dict]  # Up to three relevant historical question/SQL pairs.
+    retrieval_mode: str  # Actual history search: none, keyword, or hybrid.
     sql: str
     explanation: str
-    attempts: int
-    validation_error: str | None
+    attempts: int  # Includes the initial proposal and all corrections.
+    validation_error: str | None  # None when no validation error is recorded.
 
 
 class SQLAgent:
@@ -52,6 +55,7 @@ class SQLAgent:
             if max_repairs is None
             else max_repairs
         )
+        # Nodes return changed fields; LangGraph merges them into the shared state.
         graph = StateGraph(State)
         graph.add_node("retrieve", self._retrieve)
         graph.add_node("generate", self._generate)
@@ -59,6 +63,7 @@ class SQLAgent:
         graph.add_edge(START, "retrieve")
         graph.add_edge("retrieve", "generate")
         graph.add_edge("generate", "validate")
+        # Five repairs allow six generations: the first proposal plus corrections.
         graph.add_conditional_edges(
             "validate",
             lambda state: (
@@ -70,9 +75,12 @@ class SQLAgent:
         self.graph = graph.compile()
 
     def _retrieve(self, state: State) -> dict:
+        """Build the prompt from the full schema, session memory, and past examples."""
         schema = self.database.schema()
+        # Both reads use this database: six session turns, then 200 across sessions.
         memory = self.history.recent(state["session_id"])
         history = self.history.successful()
+        # Recent questions give follow-ups such as "group that by month" context.
         query = " ".join(
             [state["question"], *(item["question"] for item in memory[-2:])]
         )
@@ -80,13 +88,16 @@ class SQLAgent:
         examples = []
         retrieval_mode = "none"
         if history:
+            # Embed question text only, reusing cached vectors when available.
             hybrid = self.retriever.prepare([query, *history_texts])
             retrieval_mode = "hybrid" if hybrid else "keyword"
+            # Ranked positions map back to the question and its successful SQL.
             examples = [
                 {"question": history[i]["question"], "sql": history[i]["sql"]}
                 for i in self.retriever.rank(query, history_texts, 3)
             ]
         context = {
+            # Full CREATE statements preserve columns, primary keys, and foreign keys.
             "schema": [table["sql"] for table in schema],
             "successful_examples": examples,
             "conversation": [
@@ -113,6 +124,8 @@ class SQLAgent:
         }
 
     def _generate(self, state: State) -> dict:
+        """Generate SQL, or ask the model to repair its latest invalid proposal."""
+        # Keep the base prompt unchanged; each repair adds only the latest error.
         messages = list(state["messages"])
         if state.get("validation_error"):
             messages.extend(
@@ -139,6 +152,7 @@ class SQLAgent:
         }
 
     def _validate(self, state: State) -> dict:
+        # EXPLAIN checks SQL without running it; errors trigger the correction loop.
         try:
             self.database.validate(state["sql"])
             return {"validation_error": None}
@@ -146,6 +160,7 @@ class SQLAgent:
             return {"validation_error": str(exc)}
 
     def propose(self, question: str, session_id: str, model: str) -> dict:
+        """Run the graph and return a proposal; the terminal handles user approval."""
         state = self.graph.invoke(
             {
                 "question": question,

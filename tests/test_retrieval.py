@@ -1,4 +1,4 @@
-"""Hybrid ranking, embedding reuse, provider fallback, and retrieval boundaries."""
+"""Offline tests for hybrid ranking, embedding reuse, fallback, and history scope."""
 
 import json
 import sqlite3
@@ -16,6 +16,7 @@ from benchmarks.run import load_database
 def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
     query = "revenue"
     documents = ["revenue revenue", "revenue cost", "turnover", "expenses"]
+    # Small, fixed vectors control semantic rankings without an embedding API.
     vectors = {
         query: [1, 0],
         documents[0]: [0.6, 0.8],
@@ -43,6 +44,7 @@ def test_equal_rank_weights_balance_opposite_rankings():
 
 
 def test_semantic_search_finds_synonyms_and_uses_cosine_similarity():
+    # A much larger vector must not outrank a closer direction after normalization.
     vectors = {"buyers": [1, 0], "customers": [3, 0], "products": [100, 100]}
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
     assert keyword_rank("buyers", ["customers", "products"]) == []
@@ -59,6 +61,7 @@ def test_cache_embeds_only_new_or_changed_text():
 
     retriever = Retriever(embed)
     initial = ["question", "List customers", "past question"]
+    # Repeated text is deduplicated within a batch and reused across later batches.
     assert retriever.prepare([*initial, "past question"])
     assert retriever.prepare(initial)
     assert retriever.prepare([*initial, "new history question"])
@@ -88,6 +91,7 @@ def test_embedding_failure_falls_back_clearly_and_does_not_repeat(capsys):
     assert len(calls) == 1
 
 
+# Cover a zero vector, the wrong response count, and a non-finite vector.
 @pytest.mark.parametrize("vectors", [[[0, 0]], [[1, 0], [1, 0]], [[float("nan"), 1]]])
 def test_invalid_embedding_response_uses_keyword_fallback(vectors, capsys):
     retriever = Retriever(lambda texts: vectors)
@@ -173,6 +177,7 @@ def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
 
 def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path):
     path = tmp_path / "source.db"
+    # Unrelated tables and a view prove retrieval never narrows the schema.
     with sqlite3.connect(path) as connection:
         connection.executescript("""
             CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);
@@ -209,6 +214,7 @@ def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path
     assert any("REFERENCES customers(id)" in ddl for ddl in contexts[-1]["schema"])
     assert batches == [[question, previous_question]]
 
+    # Schema changes must appear even when the query and history embeddings are cached.
     with sqlite3.connect(path) as connection:
         connection.execute("ALTER TABLE unrelated_c ADD COLUMN note TEXT")
     agent.propose(question, "session", "test-model")
@@ -245,6 +251,7 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
 ):
     source = load_database("s01_retail", tmp_path)
     history = History(tmp_path / "history.db", dataset=str(source.path))
+    # Exceed the 200-history and six-turn limits to check which records reach context.
     for i in range(201):
         history.save(
             "archive",
@@ -259,6 +266,7 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
     other = History(history.path, dataset="another-database")
     other.save("session", "OTHER_DATABASE_QUESTION", "test", "SELECT 99")
     history.save("session", "FAILED_QUESTION", "test", "SELECT missing")
+    # Simulate a legacy failed record; the current save() method only writes successes.
     with sqlite3.connect(history.path) as connection:
         connection.execute(
             "UPDATE queries SET status = 'failed' WHERE question = 'FAILED_QUESTION'"
@@ -281,6 +289,7 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
     embedded = {text for batch in batches for text in batch}
     assert {item["question"] for item in candidates} <= embedded
     assert "Archive question 000" not in embedded
+    # Distinct markers expose accidental SQL, schema, or excluded-history embeddings.
     assert not any(
         "CREATE TABLE" in text
         or "SQL_TEXT_MARKER" in text
@@ -298,6 +307,7 @@ def test_history_scope_limits_question_only_embeddings_and_incremental_updates(
     history.save(
         "archive", "Fresh receipt question", "test", "SELECT 42 AS SQL_TEXT_MARKER"
     )
+    # The same search reuses its cache and embeds only the newly saved question.
     agent.propose("Customer spending", "session", "test-model")
     assert batches[-1] == ["Fresh receipt question"]
 
