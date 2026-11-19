@@ -8,3 +8,7 @@ data/*
 !data/history.db
 benchmarks/results*
 .DS_Store
+
+# Published benchmark snapshot; runtime lock stays local.
+!benchmarks/results-openai-10-2026-11-19/
+benchmarks/results-openai-10-2026-11-19/.runner.lock

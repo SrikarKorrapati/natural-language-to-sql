@@ -38,6 +38,8 @@ def test_runner_switches_schemas_and_keeps_failures(tmp_path, monkeypatch):
             history.save("benchmark", "previous question", "test-model", "SELECT 1")
 
         def propose(self, question, session_id, model):
+            if question == "clarification":
+                return {"sql": None, "explanation": "Please clarify.", "attempts": 1}
             queries = {
                 # Changed SQL and column aliases can still produce the correct answer.
                 "equivalent": "SELECT value AS alternate_name FROM numbers",
@@ -55,7 +57,7 @@ def test_runner_switches_schemas_and_keeps_failures(tmp_path, monkeypatch):
             "question": name,
             "expected_sql": "SELECT 1",
         }
-        for name in ("equivalent", "wrong", "invalid", "truncated")
+        for name in ("equivalent", "wrong", "invalid", "truncated", "clarification")
     ]
     cases.append(
         {
@@ -67,12 +69,13 @@ def test_runner_switches_schemas_and_keeps_failures(tmp_path, monkeypatch):
     )
     report = run(["test-model"], cases, agent_factory=FakeAgent)
     scores = report["models"]["test-model"]
-    assert scores["execution_accuracy"] == pytest.approx(2 / 5)
-    assert scores["valid_sql_rate"] == pytest.approx(4 / 5)
+    assert scores["execution_accuracy"] == pytest.approx(2 / 6)
+    assert scores["valid_sql_rate"] == pytest.approx(4 / 6)
     assert scores["results"][2]["error"]
     assert scores["results"][3]["error"] == "Generated result is truncated."
-    assert scores["results"][4]["schema_id"] == "second"
-    assert scores["results"][4]["correct"]
+    assert scores["results"][4]["error"] == "No SQL generated: Please clarify."
+    assert scores["results"][5]["schema_id"] == "second"
+    assert scores["results"][5]["correct"]
 
 
 def test_reference_queries_execute_on_all_twenty_schemas(tmp_path):

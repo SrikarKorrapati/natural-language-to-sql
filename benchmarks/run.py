@@ -95,6 +95,11 @@ def run(models, cases, agent_factory=SQLAgent):
                     "attempts": 0,
                     "sql": None,
                     "retrieval_mode": None,
+                    "input_valid": None,
+                    "classification_explanation": None,
+                    "critique_rounds": 0,
+                    "critique_approved": None,
+                    "critique_issues": [],
                     "error": None,
                 }
                 # Time generation, corrections, validation, and execution; exclude setup.
@@ -105,7 +110,14 @@ def run(models, cases, agent_factory=SQLAgent):
                         sql=proposal["sql"],
                         attempts=proposal["attempts"],
                         retrieval_mode=proposal.get("retrieval_mode"),
+                        input_valid=proposal.get("input_valid"),
+                        classification_explanation=proposal.get("classification_explanation"),
+                        critique_rounds=proposal.get("critique_rounds", 0),
+                        critique_approved=proposal.get("critique_approved"),
+                        critique_issues=proposal.get("critique_issues", []),
                     )
+                    if proposal["sql"] is None:
+                        raise ValueError("No SQL generated: " + proposal["explanation"])
                     database.validate(proposal["sql"])
                     result["valid_sql"] = True
                     # Benchmark fixtures run automatically without terminal approval.

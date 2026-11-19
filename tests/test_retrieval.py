@@ -255,7 +255,10 @@ def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path
     history = History(tmp_path / "history.db", dataset=str(path))
     previous_question = "List customer names"
     history.save("past", previous_question, "test", "SELECT name FROM customers")
-    agent = SQLAgent(database, history, complete=complete, retriever=Retriever(embed))
+    agent = SQLAgent(
+        database, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, retriever=Retriever(embed),
+        critique_complete=lambda *_: {"approved": True, "issues": []},
+    )
     question = "Who purchased recently?"
     proposal = agent.propose(question, "session", "test-model")
     schema = database.schema()
@@ -289,7 +292,8 @@ def test_empty_history_sends_full_schema_without_retrieval(tmp_path, monkeypatch
         return {"sql": "SELECT 1", "explanation": "One."}
 
     proposal = SQLAgent(
-        database, history, complete=complete, retriever=retriever
+        database, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, retriever=retriever,
+        critique_complete=lambda *_: {"approved": True, "issues": []},
     ).propose("List customers", "session", "test-model")
     assert proposal["retrieval_mode"] == "none"
     assert proposal["examples"] == []
@@ -332,7 +336,10 @@ def test_history_scope_limits_question_only_embeddings_and_updated_candidates(
         return {"sql": "SELECT 1", "explanation": "One."}
 
     retriever = Retriever(embed)
-    agent = SQLAgent(source, history, complete=complete, retriever=retriever)
+    agent = SQLAgent(
+        source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, retriever=retriever,
+        critique_complete=lambda *_: {"approved": True, "issues": []},
+    )
     proposal = agent.propose("Customer spending", "session", "test-model")
     candidates = history.successful()
     assert len(candidates) == 200
@@ -400,7 +407,9 @@ def test_chat_only_provider_reports_keyword_mode_without_changing_endpoint(
     agent = SQLAgent(
         source,
         history,
+        classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."},
         complete=lambda model, messages: {"sql": "SELECT 1", "explanation": "One."},
+        critique_complete=lambda *_: {"approved": True, "issues": []},
     )
     proposal = agent.propose("List customers", "session", "test")
     assert proposal["retrieval_mode"] == "keyword"

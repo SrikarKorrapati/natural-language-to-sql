@@ -1,0 +1,5 @@
+# Generated benchmark data: preserve payload formatting and keep reviews focused.
+benchmarks/results-openai-10-2026-11-19/*.json linguist-generated=true
+benchmarks/results-openai-10-2026-11-19/*.jsonl linguist-generated=true
+benchmarks/results-openai-10-2026-11-19/*.csv linguist-generated=true -whitespace
+benchmarks/results-openai-10-2026-11-19/*.svg linguist-generated=true

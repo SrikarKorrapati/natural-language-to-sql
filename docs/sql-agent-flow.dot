@@ -1,0 +1,52 @@
+digraph SQLAgent {
+  graph [rankdir=TB, bgcolor="#ffffff", pad=0.35, nodesep=0.65, ranksep=0.55,
+    fontname="Arial", fontsize=24, labelloc=t,
+    label="Natural language to SQL\nClassifier, generator and critic: separate model calls"];
+  node [shape=box, style="rounded,filled", fillcolor="#eaf1ff", color="#5472a5",
+    fontname="Arial", fontsize=15, margin="0.22,0.15", penwidth=1.4];
+  edge [fontname="Arial", fontsize=12, color="#596579", arrowsize=0.8];
+
+  subgraph cluster_agent {
+    label="LangGraph · SQLAgent.propose()";
+    fontsize=18; color="#b7c8df"; style="rounded";
+    start [label="User message", shape=oval, fillcolor="#f2f2f2"];
+    classify [label="1  CLASSIFY\nFull schema + last 6 successful session turns\nIs this an answerable read-only request?\nReturn valid + explanation; generate no SQL"];
+    retrieve [label="2  RETRIEVE\nReuse schema and conversation\nRank up to 200 successful past questions\nKeyword + semantic search → up to 3 examples"];
+    generate [label="3  GENERATE\nFull context → SQL + explanation\nUse latest validation and critique feedback\nIncrement generation attempts"];
+    validate [label="4  VALIDATE\nCompile SQL with SQLite EXPLAIN\nCheck syntax, schema and permissions\nSkip SQLite when SQL is null"];
+    critique [label="5  CRITIQUE\nSeparate model call with generator task context\nCheck whether the SQL answers the question\nReturn approved + actionable issues"];
+    done [label="END · return proposal", shape=oval, fillcolor="#f2f2f2"];
+
+    start -> classify;
+    classify -> retrieve [label="valid = true"];
+    classify -> done [label="valid = false\nNo retrieval or generation", constraint=false, color="#b66a3c"];
+    retrieve -> generate;
+    generate -> validate;
+    validate -> generate [label="SQLite error\nSQL repair budget remains", constraint=false, color="#b66a3c"];
+    validate -> critique [label="Valid SQL"];
+    validate -> done [label="No SQL, or SQL repair\nbudget exhausted", constraint=false];
+    critique -> generate [label="Rejected review\nFewer than 3 reviews", constraint=false, color="#b66a3c"];
+    critique -> done [label="Approved, or 3 reviews reached"];
+  }
+
+  subgraph cluster_terminal {
+    label="Terminal · human approval";
+    fontsize=18; color="#c8d7be"; style="rounded";
+    reply [label="Print explanation or clarification\nReturn to Ask>\nNo approval, execution or saved history", fillcolor="#fff4ce", color="#9a771e"];
+    review [label="Show SQL, explanation and attempts\nShow validation and critique status/issues"];
+    approve [label="Run this SQL?", shape=diamond, fillcolor="#fff4ce", color="#9a771e"];
+    edit [label="Read replacement SQL\nLabel it unreviewed by critic\nAsk for approval again"];
+    skip [label="Skip · return to Ask>", fillcolor="#f2f2f2"];
+    execute [label="Execute against source database\nRead-only · 3-second limit · 500-row cap"];
+    save [label="On successful execution\nSave question + SQL under database/session\nPrint results · return to Ask>", fillcolor="#e8f4e8", color="#538255"];
+
+    review -> approve;
+    approve -> edit [label="edit"];
+    edit -> approve [constraint=false];
+    approve -> skip [label="Enter / no"];
+    approve -> execute [label="yes"];
+    execute -> save;
+  }
+  done -> reply [label="sql is null"];
+  done -> review [label="SQL exists"];
+}

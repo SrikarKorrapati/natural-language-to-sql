@@ -119,7 +119,10 @@ def test_graph_repairs_invalid_sql_before_review(source, history):
         )
         return {"sql": sql, "explanation": "List customer names."}
 
-    result = SQLAgent(source, history, complete=complete, max_repairs=2).propose(
+    result = SQLAgent(
+        source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, max_repairs=2,
+        critique_complete=lambda *_: {"approved": True, "issues": []},
+    ).propose(
         "List customer names", "session-one", "test-model"
     )
     assert result["attempts"] == 2
@@ -141,7 +144,7 @@ def test_graph_has_a_finite_repair_budget(source, history, max_repairs):
         return {"sql": "SELECT absent FROM customers", "explanation": "Invalid draft."}
 
     result = SQLAgent(
-        source, history, complete=complete, max_repairs=max_repairs
+        source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, max_repairs=max_repairs
     ).propose("List customers", "session-one", "test-model")
     # Corrections are additional to the initial generation attempt.
     assert len(calls) == max_repairs + 1
@@ -153,8 +156,8 @@ def test_repair_budget_can_be_configured_by_environment(source, history, monkeyp
     from app.agent import SQLAgent
 
     monkeypatch.setenv("SQL_MAX_REPAIRS", "1")
-    assert SQLAgent(source, history).max_repairs == 1
-    assert SQLAgent(source, history, max_repairs=0).max_repairs == 0
+    assert SQLAgent(source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}).max_repairs == 1
+    assert SQLAgent(source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, max_repairs=0).max_repairs == 0
 
 
 def test_model_adapter_uses_json_chat_completion(monkeypatch):
@@ -226,7 +229,10 @@ def test_follow_up_receives_only_approved_conversation_context(source, history):
             "explanation": "Filter the earlier query.",
         }
 
-    agent = SQLAgent(source, history, complete=complete)
+    agent = SQLAgent(
+        source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete,
+        critique_complete=lambda *_: {"approved": True, "issues": []},
+    )
     # Generating a proposal alone must not add it to later conversation context.
     agent.propose("UNAPPROVED_MARKER", "session-one", "test-model")
     agent.propose("Now only North", "session-one", "test-model")
@@ -241,7 +247,94 @@ def agent(source, history):
     def complete(model, messages):
         return {"sql": "SELECT name FROM customers", "explanation": "List customers."}
 
-    return SQLAgent(source, history, complete=complete)
+    return SQLAgent(
+        source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete,
+        critique_complete=lambda *_: {"approved": True, "issues": []},
+    )
+
+
+@pytest.mark.parametrize("greeting", ["hi", " HELLO! ", "Hey there?"])
+def test_greetings_do_not_request_sql_or_approval(agent, monkeypatch, capsys, greeting):
+    from app.main import run_question
+
+    agent.classify_complete = lambda *_: {
+        "valid": False, "explanation": "Ask a question about your database."
+    }
+    agent.complete = lambda *_: pytest.fail("A greeting must not call the generator")
+    monkeypatch.setattr(
+        "builtins.input", lambda *_: pytest.fail("A greeting needs no approval")
+    )
+    run_question(agent, greeting, "session-one", "test-model")
+    output = capsys.readouterr().out
+    assert "Ask a question about your database" in output
+    assert agent.history.successful() == []
+
+
+def test_chat_accepts_a_query_after_a_greeting(agent, monkeypatch, capsys):
+    from app.main import chat
+
+    # A greeting prefix must not swallow an actual database request.
+    question = "Hi, list customers"
+    decisions = iter([False, True])
+    agent.classify_complete = lambda *_: {
+        "valid": next(decisions), "explanation": "Ask about your database."
+    }
+    answers = iter(["hi", question, "yes", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    chat(agent, "session-one", "test-model")
+    output = capsys.readouterr().out
+    assert output.count("Thinking") == 2
+    assert "SELECT name FROM customers" in output
+    assert [item["question"] for item in agent.history.successful()] == [question]
+
+
+def test_model_clarification_skips_validation_approval_and_history(
+    agent, monkeypatch, capsys
+):
+    from app.main import chat
+
+    calls = []
+    explanation = "Please ask a question about the data in your database."
+
+    def complete(model, messages):
+        calls.append(messages)
+        return {"sql": None, "explanation": explanation}
+
+    agent.complete = complete
+    monkeypatch.setattr(
+        agent.database, "validate", lambda *_: pytest.fail("No SQL to validate")
+    )
+    monkeypatch.setattr(
+        agent.database, "execute", lambda *_: pytest.fail("No SQL to execute")
+    )
+    answers = iter(["Tell me a joke", "/exit"])
+
+    def reply(prompt):
+        assert prompt == "\nAsk> "
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", reply)
+    chat(agent, "session-one", "test-model")
+    assert len(calls) == 1
+    assert "sql: null" in calls[0][0]["content"]
+    assert explanation in capsys.readouterr().out
+    assert agent.history.successful() == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [None, {}, {"sql": 123, "explanation": "Wrong type"},
+     {"sql": "", "explanation": "Empty SQL"}, {"sql": None, "explanation": None}],
+)
+def test_malformed_model_answer_returns_to_chat(agent, monkeypatch, capsys, response):
+    from app.main import chat
+
+    agent.complete = lambda *_: response
+    answers = iter(["List customers", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    chat(agent, "session-one", "test-model")
+    assert "The model returned an invalid answer" in capsys.readouterr().out
+    assert agent.history.successful() == []
 
 
 @pytest.mark.parametrize("answer", ["", "n", None])

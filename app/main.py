@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 
-from app.agent import SQLAgent
+from app.agent import ModelResponseError, SQLAgent
 from app.db import Database, History
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,14 +40,29 @@ def print_result(result: dict) -> None:
 
 def run_question(agent: SQLAgent, question: str, session_id: str, model: str) -> None:
     """Generate a proposal, get approval, then execute and remember successful SQL."""
-    print("Generating SQL…")
-    proposal = agent.propose(question, session_id, model)
+    print("Thinking…")
+    try:
+        proposal = agent.propose(question, session_id, model)
+    except ModelResponseError as exc:
+        print(str(exc))
+        return
     sql = proposal["sql"]
-    print(f"\n{proposal['explanation']}\n\n{sql}")
+    print(f"\n{proposal['explanation']}")
+    if sql is None:
+        return
+    print(f"\n{sql}")
     print(f"\nAttempts: {proposal['attempts']}")
     print(f"History retrieval: {proposal['retrieval_mode']}")
     if proposal["validation_error"]:
         print(f"Validation error: {proposal['validation_error']}")
+    review = proposal["critique_approved"]
+    review_status = {True: "approved", False: "issues remain", None: "not reviewed"}[review]
+    print(
+        f"Critique: {review_status} "
+        f"({proposal['critique_rounds']}/{agent.max_critiques} rounds)"
+    )
+    for issue in proposal["critique_issues"]:
+        print(f"- {issue}")
 
     while True:
         answer = input("Run this SQL? [y/N/edit]: ").strip().lower()
@@ -58,6 +73,7 @@ def run_question(agent: SQLAgent, question: str, session_id: str, model: str) ->
                 lines.append(line)
             sql = "\n".join(lines)
             print(f"\n{sql}\n")
+            print("Edited SQL has not been reviewed by the critique agent.")
             # Editing changes the proposal, so ask for fresh approval before running.
             continue
         if answer not in {"y", "yes"}:

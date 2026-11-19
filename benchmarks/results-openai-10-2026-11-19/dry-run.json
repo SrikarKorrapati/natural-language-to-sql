@@ -1,0 +1,9 @@
+{
+  "fingerprint": "ceac1d293c5da8934218f41991f37ecabb41bcc38b091e3f2a1d251cdc0cac76",
+  "models": 10,
+  "cases_per_model": 200,
+  "pending_cases": 2000,
+  "schemas_validated": 20,
+  "references_validated": 200,
+  "dry_run": true
+}
