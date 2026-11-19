@@ -14,7 +14,9 @@ GPT-5.4 mini completed all 200 cases with 165 errors saying `The classifier retu
 
 The runner has different errors for unreadable JSON and length truncation, so these particular failures reached the classifier's shape/type checks. The raw response content is not recorded: the log cannot establish which required field was absent or mistyped. Do not describe this as 165 incorrect SQL queries or claim a specific malformed payload.
 
-A separate diagnostic subsequently returned the expected classifier contract. The recorded failure pattern is therefore intermittent, not proof that this model cannot produce the required format. Preserve the original 165 failures in the benchmark score. The diagnostic is outside `cases.jsonl`; its estimated cost of **$0.00061125** must be disclosed separately if reporting total experiment spending, rather than silently included in or omitted from a claimed all-in figure.
+A separate diagnostic on `s01_q01` subsequently returned the expected classifier contract: `valid: true` and a nonempty `explanation` confirming that the products question was answerable with a read-only query. The response identified the model as `gpt-5.4-mini-2026-03-17`; the request used low reasoning effort and an 8,192 completion-token ceiling. The recorded failure pattern is therefore intermittent, not proof that this model cannot produce the required format. Preserve the original 165 failures in the benchmark score.
+
+The diagnostic had one connection failure followed by a successful response using 395 prompt tokens and 70 completion tokens. It is outside `cases.jsonl`; its estimated cost of **$0.00061125** must be disclosed separately if reporting total experiment spending, rather than silently included in or omitted from a claimed all-in figure.
 
 ## Generator and critic disagree about LIMIT
 

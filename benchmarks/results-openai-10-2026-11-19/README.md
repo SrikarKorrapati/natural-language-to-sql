@@ -20,10 +20,6 @@ Start with the [report](report.md) and [interpretation](analysis.md). These expl
 | [cases.jsonl](cases.jsonl) | All 2,076 checkpoint records, including 76 interrupted attempts and usage |
 | [results.json](results.json) | Final runner summary and completed case results |
 | [manifest.json](manifest.json) | Model settings, code/data fingerprints and concurrency launch history |
-| [verification.json](verification.json) | Independent counts, totals, elapsed time and integrity checks |
-| [dry-run.json](dry-run.json) | Offline fixture and reference-query validation |
-| [diagnostic-54mini.json](diagnostic-54mini.json) | Separate classifier diagnostic, outside the scored run |
-| [Available model IDs](available-openai-models.md) / [JSON](available-openai-models.json) | API inventory used to select candidates |
 
 The request settings and published token prices are in [models.openai.json](../models.openai.json). No API keys are included. The raw checkpoint and summary may be too large for GitHub's inline renderer; use the raw/download links or a local clone.
 

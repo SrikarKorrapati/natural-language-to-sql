@@ -12,3 +12,9 @@ benchmarks/results*
 # Published benchmark snapshot; runtime lock stays local.
 !benchmarks/results-openai-10-2026-11-19/
 benchmarks/results-openai-10-2026-11-19/.runner.lock
+
+# Keep setup and one-off diagnostic artifacts out of the published snapshot.
+benchmarks/results-openai-10-2026-11-19/available-openai-models.*
+benchmarks/results-openai-10-2026-11-19/dry-run.json
+benchmarks/results-openai-10-2026-11-19/diagnostic-54mini.json
+benchmarks/results-openai-10-2026-11-19/verification.json
