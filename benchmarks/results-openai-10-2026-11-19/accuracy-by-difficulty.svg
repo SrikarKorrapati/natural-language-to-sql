@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1520" viewBox="0 0 1080 1520" role="img" aria-labelledby="title desc">
+<title id="title">SQL benchmark execution accuracy by difficulty</title>
+<desc id="desc">Bars use completed cases only. Each label includes correct and completed case counts.</desc>
+<rect width="1080" height="100%" fill="#f8fafc"/>
+<style>text{font-family:Arial,sans-serif;fill:#0f172a}.muted{fill:#475569}</style>
+<text x="32" y="38" font-size="23" font-weight="700">Execution accuracy by difficulty</text>
+<text x="32" y="63" font-size="13" class="muted">Full classifier → SQL generation → validation/repair → critique pipeline; completed cases only</text>
+<text x="32" y="100" font-size="17" font-weight="700">GPT-6.2 Sol</text>
+<text x="32" y="144" font-size="14">Easy</text>
+<rect x="112" y="128" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="128" width="680.00" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="144" font-size="14">100.0% · 60/60 correct</text>
+<text x="32" y="178" font-size="14">Medium</text>
+<rect x="112" y="162" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="162" width="680.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="178" font-size="14">100.0% · 80/80 correct</text>
+<text x="32" y="212" font-size="14">Hard</text>
+<rect x="112" y="196" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="196" width="668.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="212" font-size="14">98.3% · 59/60 correct</text>
+<text x="32" y="238" font-size="17" font-weight="700">GPT-6.2 Astra</text>
+<text x="32" y="282" font-size="14">Easy</text>
+<rect x="112" y="266" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="266" width="680.00" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="282" font-size="14">100.0% · 60/60 correct</text>
+<text x="32" y="316" font-size="14">Medium</text>
+<rect x="112" y="300" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="300" width="680.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="316" font-size="14">100.0% · 80/80 correct</text>
+<text x="32" y="350" font-size="14">Hard</text>
+<rect x="112" y="334" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="334" width="657.33" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="350" font-size="14">96.7% · 58/60 correct</text>
+<text x="32" y="376" font-size="17" font-weight="700">GPT-6 Luna</text>
+<text x="32" y="420" font-size="14">Easy</text>
+<rect x="112" y="404" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="404" width="657.33" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="420" font-size="14">96.7% · 58/60 correct</text>
+<text x="32" y="454" font-size="14">Medium</text>
+<rect x="112" y="438" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="438" width="680.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="454" font-size="14">100.0% · 80/80 correct</text>
+<text x="32" y="488" font-size="14">Hard</text>
+<rect x="112" y="472" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="472" width="668.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="488" font-size="14">98.3% · 59/60 correct</text>
+<text x="32" y="514" font-size="17" font-weight="700">GPT-5.5</text>
+<text x="32" y="558" font-size="14">Easy</text>
+<rect x="112" y="542" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="542" width="657.33" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="558" font-size="14">96.7% · 58/60 correct</text>
+<text x="32" y="592" font-size="14">Medium</text>
+<rect x="112" y="576" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="576" width="680.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="592" font-size="14">100.0% · 80/80 correct</text>
+<text x="32" y="626" font-size="14">Hard</text>
+<rect x="112" y="610" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="610" width="668.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="626" font-size="14">98.3% · 59/60 correct</text>
+<text x="32" y="652" font-size="17" font-weight="700">GPT-4.1</text>
+<text x="32" y="696" font-size="14">Easy</text>
+<rect x="112" y="680" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="680" width="668.67" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="696" font-size="14">98.3% · 59/60 correct</text>
+<text x="32" y="730" font-size="14">Medium</text>
+<rect x="112" y="714" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="714" width="637.50" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="730" font-size="14">93.8% · 75/80 correct</text>
+<text x="32" y="764" font-size="14">Hard</text>
+<rect x="112" y="748" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="748" width="668.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="764" font-size="14">98.3% · 59/60 correct</text>
+<text x="32" y="790" font-size="17" font-weight="700">GPT-5 nano</text>
+<text x="32" y="834" font-size="14">Easy</text>
+<rect x="112" y="818" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="818" width="657.33" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="834" font-size="14">96.7% · 58/60 correct</text>
+<text x="32" y="868" font-size="14">Medium</text>
+<rect x="112" y="852" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="852" width="629.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="868" font-size="14">92.5% · 74/80 correct</text>
+<text x="32" y="902" font-size="14">Hard</text>
+<rect x="112" y="886" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="886" width="623.33" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="902" font-size="14">91.7% · 55/60 correct</text>
+<text x="32" y="928" font-size="17" font-weight="700">GPT-4.1 mini</text>
+<text x="32" y="972" font-size="14">Easy</text>
+<rect x="112" y="956" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="956" width="646.00" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="972" font-size="14">95.0% · 57/60 correct</text>
+<text x="32" y="1006" font-size="14">Medium</text>
+<rect x="112" y="990" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="990" width="629.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="1006" font-size="14">92.5% · 74/80 correct</text>
+<text x="32" y="1040" font-size="14">Hard</text>
+<rect x="112" y="1024" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1024" width="600.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="1040" font-size="14">88.3% · 53/60 correct</text>
+<text x="32" y="1066" font-size="17" font-weight="700">GPT-5 mini</text>
+<text x="32" y="1110" font-size="14">Easy</text>
+<rect x="112" y="1094" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1094" width="600.67" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="1110" font-size="14">88.3% · 53/60 correct</text>
+<text x="32" y="1144" font-size="14">Medium</text>
+<rect x="112" y="1128" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1128" width="561.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="1144" font-size="14">82.5% · 66/80 correct</text>
+<text x="32" y="1178" font-size="14">Hard</text>
+<rect x="112" y="1162" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1162" width="623.33" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="1178" font-size="14">91.7% · 55/60 correct</text>
+<text x="32" y="1204" font-size="17" font-weight="700">GPT-4o mini</text>
+<text x="32" y="1248" font-size="14">Easy</text>
+<rect x="112" y="1232" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1232" width="600.67" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="1248" font-size="14">88.3% · 53/60 correct</text>
+<text x="32" y="1282" font-size="14">Medium</text>
+<rect x="112" y="1266" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1266" width="442.00" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="1282" font-size="14">65.0% · 52/80 correct</text>
+<text x="32" y="1316" font-size="14">Hard</text>
+<rect x="112" y="1300" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1300" width="294.67" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="1316" font-size="14">43.3% · 26/60 correct</text>
+<text x="32" y="1342" font-size="17" font-weight="700">GPT-5.4 mini</text>
+<text x="32" y="1386" font-size="14">Easy</text>
+<rect x="112" y="1370" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1370" width="124.67" height="23" rx="4" fill="#16a34a"/>
+<text x="810" y="1386" font-size="14">18.3% · 11/60 correct</text>
+<text x="32" y="1420" font-size="14">Medium</text>
+<rect x="112" y="1404" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1404" width="110.50" height="23" rx="4" fill="#2563eb"/>
+<text x="810" y="1420" font-size="14">16.2% · 13/80 correct</text>
+<text x="32" y="1454" font-size="14">Hard</text>
+<rect x="112" y="1438" width="680" height="23" rx="4" fill="#e2e8f0"/>
+<rect x="112" y="1438" width="113.33" height="23" rx="4" fill="#9333ea"/>
+<text x="810" y="1454" font-size="14">16.7% · 10/60 correct</text>
+<text x="32" y="1496" font-size="12" class="muted">Partial runs are not directly comparable; see report.md for coverage and limitations.</text>
+</svg>

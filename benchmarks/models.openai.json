@@ -1,0 +1,317 @@
+{
+  "max_repairs": 5,
+  "max_critiques": 3,
+  "request_timeout_seconds": 120,
+  "transport_retries": 2,
+  "metadata": {
+    "verified_date": "2026-11-19",
+    "selection_notes": "Ten-model spectrum of legacy, small, reasoning and current flagship models. List order is a selection order, not a measured capability ranking. The benchmark determines the ranking.",
+    "output_cap_notes": "Uniform 8192 total completion-token cap includes hidden reasoning for reasoning models. All reasoning models use low effort.",
+    "cost_notes": "Use billed completion-token totals including reasoning. Estimates are not invoices; cache-write charges and cache discounts require raw provider usage, and missing usage on failed requests can make totals incomplete."
+  },
+  "models": [
+    {
+      "model_id": "gpt-4o-mini",
+      "label": "GPT-4o mini",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 0.15,
+        "cached_input_per_million": 0.075,
+        "output_per_million": 0.6
+      },
+      "metadata": {
+        "tier": "legacy_small_non_reasoning",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "default_snapshot": "gpt-4o-mini-2024-07-18",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-4o-mini",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode",
+          "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5",
+          "https://developers.openai.com/api/docs/deprecations"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. The completion cap is 8192 tokens including hidden reasoning, where applicable.",
+        "status": "deprecated",
+        "shutdown_date": "2027-01-14"
+      }
+    },
+    {
+      "model_id": "gpt-4.1-mini",
+      "label": "GPT-4.1 mini",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 0.4,
+        "cached_input_per_million": 0.1,
+        "output_per_million": 1.6
+      },
+      "metadata": {
+        "tier": "legacy_low_cost_non_reasoning",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "status": "deprecated",
+        "shutdown_date": "2027-01-14",
+        "default_snapshot": "gpt-4.1-mini-2025-04-14",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-4.1-mini",
+          "https://developers.openai.com/api/docs/deprecations",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. Non-reasoning model: omit reasoning_effort. Default snapshot is scheduled to shut down January 14, 2027."
+      }
+    },
+    {
+      "model_id": "gpt-5-nano",
+      "label": "GPT-5 nano",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192,
+        "reasoning_effort": "low"
+      },
+      "pricing": {
+        "input_per_million": 0.05,
+        "cached_input_per_million": 0.005,
+        "output_per_million": 0.4
+      },
+      "metadata": {
+        "tier": "legacy_nano_reasoning",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "default_snapshot": "gpt-5-nano-2025-08-07",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5-nano",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode",
+          "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5",
+          "https://developers.openai.com/api/docs/deprecations"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. The completion cap is 8192 tokens including hidden reasoning, where applicable.",
+        "status": "deprecated",
+        "shutdown_date": "2026-12-11"
+      }
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "label": "GPT-5 mini",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192,
+        "reasoning_effort": "low"
+      },
+      "pricing": {
+        "input_per_million": 0.25,
+        "cached_input_per_million": 0.025,
+        "output_per_million": 2.0
+      },
+      "metadata": {
+        "tier": "legacy_mini_reasoning",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "default_snapshot": "gpt-5-mini-2025-08-07",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5-mini",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode",
+          "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5",
+          "https://developers.openai.com/api/docs/deprecations"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. The completion cap is 8192 tokens including hidden reasoning, where applicable.",
+        "status": "deprecated",
+        "shutdown_date": "2026-12-11"
+      }
+    },
+    {
+      "model_id": "gpt-4.1",
+      "label": "GPT-4.1",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 2.0,
+        "cached_input_per_million": 0.5,
+        "output_per_million": 8.0
+      },
+      "metadata": {
+        "tier": "legacy_non_reasoning",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "status": "deprecated",
+        "shutdown_date": "2027-01-14",
+        "default_snapshot": "gpt-4.1-2025-04-14",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-4.1",
+          "https://developers.openai.com/api/docs/deprecations",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. Non-reasoning model: omit reasoning_effort. Default snapshot is scheduled to shut down January 14, 2027."
+      }
+    },
+    {
+      "model_id": "gpt-5.4-mini",
+      "label": "GPT-5.4 mini",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "reasoning_effort": "low",
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "cached_input_per_million": 0.075,
+        "output_per_million": 4.5
+      },
+      "metadata": {
+        "tier": "prior_generation_mini",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "default_snapshot": "gpt-5.4-mini-2026-03-17",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.4-mini",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode",
+          "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. Reasoning effort low is supported. Completion tokens include billed hidden reasoning."
+      }
+    },
+    {
+      "model_id": "gpt-5.5",
+      "label": "GPT-5.5",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "max_completion_tokens": 8192,
+        "reasoning_effort": "low"
+      },
+      "pricing": {
+        "input_per_million": 5.0,
+        "cached_input_per_million": 0.5,
+        "output_per_million": 30.0
+      },
+      "metadata": {
+        "tier": "prior_generation_flagship",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "default_snapshot": "gpt-5.5-2026-04-23",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.5",
+          "https://developers.openai.com/api/docs/guides/structured-outputs#json-mode",
+          "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5"
+        ],
+        "compatibility_notes": "Chat Completions and structured outputs supported. The completion cap is 8192 tokens including hidden reasoning, where applicable."
+      }
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "reasoning_effort": "low",
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 0.1,
+        "output_per_million": 0.5,
+        "cached_input_per_million": 0.01,
+        "cache_write_per_million": 0.125
+      },
+      "metadata": {
+        "tier": "low_cost",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-luna",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create"
+        ],
+        "cost_notes": "Completion tokens include billed hidden reasoning. Estimates include reported cache-read discounts and exclude cache-write premiums and service-tier or regional premiums.",
+        "cache_write_retention": "30m"
+      }
+    },
+    {
+      "model_id": "gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "reasoning_effort": "low",
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 2.0,
+        "output_per_million": 10.0,
+        "cached_input_per_million": 0.1,
+        "cache_write_per_million": 2.5
+      },
+      "metadata": {
+        "tier": "balanced",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+          "https://developers.openai.com/api/docs/guides/latest-model#update-api-and-model-parameters",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "cost_notes": "Completion tokens include billed hidden reasoning. Estimates include reported cache-read discounts and exclude cache-write premiums and service-tier or regional premiums.",
+        "cache_write_retention": "30m"
+      }
+    },
+    {
+      "model_id": "gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "provider": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY"
+      },
+      "request_kwargs": {
+        "reasoning_effort": "low",
+        "max_completion_tokens": 8192
+      },
+      "pricing": {
+        "input_per_million": 8.0,
+        "output_per_million": 40.0,
+        "cached_input_per_million": 0.4,
+        "cache_write_per_million": 10.0
+      },
+      "metadata": {
+        "tier": "highest_capability",
+        "pricing_tier": "standard",
+        "verified_date": "2026-11-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+          "https://developers.openai.com/api/docs/guides/latest-model#update-api-and-model-parameters",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "cost_notes": "Completion tokens include billed hidden reasoning. Estimates include reported cache-read discounts and exclude cache-write premiums and service-tier or regional premiums.",
+        "cache_write_retention": "30m"
+      }
+    }
+  ]
+}
