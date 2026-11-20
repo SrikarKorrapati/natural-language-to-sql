@@ -4,7 +4,10 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+import httpx
+from openai import PermissionDeniedError
 
+from benchmarks import run as runner
 from benchmarks.run import load_database, rows_equal, run
 
 
@@ -22,6 +25,50 @@ def test_result_comparison_respects_duplicates_order_and_float_tolerance():
 def test_ambiguous_float_matches_do_not_depend_on_row_order():
     # The first actual row matches both expected rows; the second matches only the first.
     assert rows_equal([[1.0000009], [1.0]], [[1.0000001], [1.0000018]])
+
+
+def test_large_integer_float_comparison_does_not_erase_real_differences():
+    exact = 2 ** 53
+    assert rows_equal([[exact]], [[float(exact)]])
+    assert not rows_equal([[exact + 1]], [[float(exact)]])
+    assert not rows_equal([[float(exact)]], [[exact + 1]])
+    assert not rows_equal([[2 ** 63 - 1]], [[float(2 ** 63 - 1)]])
+    assert rows_equal([[1]], [[1.0000001]])
+    assert not rows_equal([[1]], [[1.00001]])
+
+
+@pytest.mark.parametrize('models,cases', [([], []), (['test'], []), ([], [{}])])
+def test_empty_benchmark_input_is_rejected_before_setup(models, cases):
+    with pytest.raises(ValueError):
+        run(models, cases)
+
+
+@pytest.mark.parametrize('schema_id', ['../outside', '/absolute', 'nested/name', 'nested\\name', '..'])
+def test_fixture_name_cannot_escape_schema_directory(schema_id, tmp_path):
+    with pytest.raises(ValueError, match='fixture name'):
+        load_database(schema_id, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_provider_errors_are_redacted_and_cli_reports_failure(tmp_path, monkeypatch):
+    class BrokenAgent:
+        def __init__(self, database, history):
+            pass
+
+        def propose(self, *args):
+            response = httpx.Response(403, request=httpx.Request('POST', 'https://example.test'))
+            raise PermissionDeniedError('private-provider-detail', response=response, body=None)
+
+    cases = [dict(id='one', schema_id='s01_retail', question='Return one', expected_sql='SELECT 1')]
+    report = run(['test-model'], cases, agent_factory=BrokenAgent)
+    result = report['models']['test-model']['results'][0]
+    assert result['provider_error']
+    assert 'private-provider-detail' not in result['error']
+    path = tmp_path / 'cases.json'
+    path.write_text(json.dumps(cases))
+    monkeypatch.setattr(runner, 'run', lambda *args: report)
+    assert runner.main(['--models', 'test-model', '--cases', str(path),
+                        '--output', str(tmp_path / 'results.json')]) == 1
 
 
 def test_runner_switches_schemas_and_keeps_failures(tmp_path, monkeypatch):

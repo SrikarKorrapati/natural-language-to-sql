@@ -11,9 +11,10 @@ from openai import OpenAI
 
 def tokens(text: str) -> Counter:
     """Count lowercase letter/number words, ignoring single-character tokens."""
-    # Stripping final s characters roughly matches plurals, but also changes "status".
+    # Remove at most one plural s; preserve short words and endings such as "class".
+    # This is still a crude stemmer (for example, "status" becomes "statu").
     return Counter(
-        word.rstrip("s")
+        word[:-1] if len(word) > 2 and word.endswith("s") and not word.endswith("ss") else word
         for word in re.findall(r"[a-z0-9]+", text.lower())
         if len(word) > 1
     )
@@ -46,7 +47,9 @@ class Retriever:
 
     def rank(self, query: str, texts: list[str], limit: int) -> tuple[list[int], str]:
         """Return ranked text indexes and the retrieval mode actually used."""
-        if not texts:
+        if type(limit) is not int or limit < 0:
+            raise ValueError("limit must be a nonnegative integer")
+        if not texts or limit == 0:
             return [], "none"
         keyword = keyword_rank(query, texts)
         if self.embed is None:
@@ -92,7 +95,10 @@ class Retriever:
 
 def configured_retriever() -> Retriever:
     """Create a retriever using the current environment settings."""
-    if os.getenv("RETRIEVAL_MODE", "hybrid") != "hybrid":
+    mode = os.getenv("RETRIEVAL_MODE", "hybrid").strip().lower()
+    if mode not in {"hybrid", "keyword"}:
+        raise ValueError("RETRIEVAL_MODE must be 'hybrid' or 'keyword'")
+    if mode == "keyword":
         return Retriever()
 
     # Separate embedding settings override chat settings for chat-only providers.

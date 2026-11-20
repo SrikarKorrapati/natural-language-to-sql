@@ -61,6 +61,68 @@ def test_critic_shares_full_context_and_repairs_semantic_error(source, history, 
     assert history.successful() == before
 
 
+def test_complete_listing_relies_on_execution_cap_instead_of_an_added_sql_limit(source, history):
+    systems = []
+    sql = "SELECT name FROM customers ORDER BY id"
+
+    def generate(_, messages):
+        systems.append(messages[0]["content"])
+        return {"sql": sql, "explanation": "All customer names in ID order."}
+
+    def critique(_, messages):
+        systems.append(messages[0]["content"])
+        return {"approved": True, "issues": []}
+
+    source.max_rows = 2
+    proposal = SQLAgent(
+        source, history,
+        classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."},
+        complete=generate, critique_complete=critique,
+    ).propose("List all customer names ordered by customer ID", "session", "model")
+
+    # Both roles must agree: completeness belongs to SQL; display limits belong to execution.
+    for system in systems:
+        assert "Do not add an arbitrary LIMIT to a complete listing" in system
+        assert "execution layer separately caps returned rows and reports truncation" in system
+        assert "Add a sensible LIMIT to detail listings" not in system
+    assert len(systems) == 2
+    assert proposal["sql"] == sql
+    assert proposal["attempts"] == proposal["critique_rounds"] == 1
+    result = source.execute(proposal["sql"])
+    assert result["rows"] == [["Avery"], ["Jordan"]]
+    assert result["truncated"] is True
+
+
+@pytest.mark.parametrize(("question", "sql", "expected"), [
+    ("List the first two customers by ID",
+     "SELECT name FROM customers ORDER BY id LIMIT 2", [["Avery"], ["Jordan"]]),
+    ("Skip the first two customers by ID and list the next two",
+     "SELECT name FROM customers ORDER BY id LIMIT 2 OFFSET 2", [["Morgan"], ["Riley"]]),
+    ("Return the most recent order ID",
+     "SELECT id FROM orders ORDER BY ordered_at DESC, id DESC LIMIT 1", [[9]]),
+])
+def test_requested_and_semantically_required_limits_are_preserved(source, history, question, sql, expected):
+    def generate(_, messages):
+        assert "Preserve requested limits and ordering" in messages[0]["content"]
+        return {"sql": sql, "explanation": "Applies the requested selection."}
+
+    def critique(_, messages):
+        assert "Preserve requested limits and ordering" in messages[0]["content"]
+        assert json.loads(messages[1]["content"])["proposal"]["sql"] == sql
+        return {"approved": True, "issues": []}
+
+    proposal = SQLAgent(
+        source, history,
+        classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."},
+        complete=generate, critique_complete=critique,
+    ).propose(question, "session", "model")
+    assert proposal["sql"] == sql
+    assert proposal["critique_approved"] is True
+    result = source.execute(proposal["sql"])
+    assert result["rows"] == expected
+    assert result["truncated"] is False
+
+
 def test_default_threshold_stops_after_exactly_three_reviews(source, history):
     generated, reviewed = [], []
 

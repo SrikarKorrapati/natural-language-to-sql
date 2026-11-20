@@ -2,10 +2,12 @@
 
 import argparse
 import os
+import sqlite3
 from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
+from openai import OpenAIError
 
 from app.agent import ModelResponseError, SQLAgent
 from app.db import Database, History
@@ -53,6 +55,7 @@ def run_question(agent: SQLAgent, question: str, session_id: str, model: str) ->
     print(f"\n{sql}")
     print(f"\nAttempts: {proposal['attempts']}")
     print(f"History retrieval: {proposal['retrieval_mode']}")
+    print(f"Column inspections: {proposal.get('tool_calls', 0)}")
     if proposal["validation_error"]:
         print(f"Validation error: {proposal['validation_error']}")
     review = proposal["critique_approved"]
@@ -79,10 +82,17 @@ def run_question(agent: SQLAgent, question: str, session_id: str, model: str) ->
         if answer not in {"y", "yes"}:
             print("Skipped.")
             return
-        result = agent.database.execute(sql)
-        # Saving happens after execution, keeping skipped and failed SQL out of history.
-        agent.history.save(session_id, question, model, sql)
+        try:
+            result = agent.database.execute(sql)
+        except sqlite3.Error as exc:
+            print(f"Could not execute SQL: {exc}. Edit the query or skip it.")
+            continue
         print_result(result)
+        # A journal failure must not hide results or imply that execution failed.
+        try:
+            agent.history.save(session_id, question, model, sql)
+        except sqlite3.Error as exc:
+            print(f"Query ran, but conversation history could not be saved: {exc}")
         return
 
 
@@ -111,6 +121,13 @@ def chat(agent: SQLAgent, session_id: str, model: str) -> None:
                 print(COMMANDS)
             elif question:
                 run_question(agent, question, session_id, model)
+        except OpenAIError as exc:
+            status = getattr(exc, "status_code", None)
+            detail = f" (HTTP {status})" if status else ""
+            # Provider error bodies may contain credentials or submitted context.
+            print(f"Model provider request failed{detail}. Check API settings and connection, then try again.")
+        except sqlite3.Error as exc:
+            print(f"Database error: {exc}")
         except (EOFError, KeyboardInterrupt):
             print()
             return
@@ -126,10 +143,14 @@ def main(argv=None) -> None:
         "--session", default="default", help="Conversation name to start or resume"
     )
     args = parser.parse_args(argv)
-    database = Database(args.database.expanduser())
-    # The resolved database path keeps each source's saved queries separate.
-    history = History(ROOT / "data" / "history.db", dataset=str(database.path))
-    agent = SQLAgent(database, history)
+    try:
+        database = Database(args.database.expanduser())
+        # Fail before creating history or calling a model for a missing/invalid database.
+        database.schema()
+        history = History(ROOT / "data" / "history.db", dataset=str(database.path))
+        agent = SQLAgent(database, history)
+    except (sqlite3.Error, OSError, ValueError) as exc:
+        parser.error(f"Cannot start: {exc}")
     chat(agent, args.session, args.model)
 
 

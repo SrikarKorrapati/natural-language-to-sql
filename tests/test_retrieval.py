@@ -13,6 +13,27 @@ from app.retrieval import Retriever, configured_retriever, keyword_rank
 from benchmarks.run import load_database
 
 
+def test_keyword_stemming_does_not_merge_empty_terms_or_strip_double_s():
+    assert keyword_rank("ss", ["sss"]) == []
+    assert keyword_rank("class", ["clas", "class"]) == [1]
+    assert keyword_rank("customers", ["customer"]) == [0]
+
+
+def test_zero_retrieval_limit_skips_provider_and_returns_no_examples():
+    retriever = Retriever(lambda *_: pytest.fail("No examples requested"))
+    assert retriever.rank("customers", ["customers"], 0) == ([], "none")
+    with pytest.raises(ValueError, match="limit"):
+        retriever.rank("customers", ["customers"], -1)
+
+
+def test_invalid_retrieval_mode_is_not_silently_treated_as_keyword(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_MODE", "hybird")
+    with pytest.raises(ValueError, match="RETRIEVAL_MODE"):
+        configured_retriever()
+    monkeypatch.setenv("RETRIEVAL_MODE", " KEYWORD ")
+    assert configured_retriever().rank("customers", ["customers"], 1) == ([0], "keyword")
+
+
 def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
     query = "revenue"
     documents = ["revenue revenue", "revenue cost", "turnover", "expenses"]

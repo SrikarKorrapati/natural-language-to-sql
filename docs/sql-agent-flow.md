@@ -9,12 +9,12 @@ flowchart TD
         Start([START]) --> Classify["classify · _classify<br/>Read the full schema and up to 6 successful session turns<br/>Separate model call: is this an answerable read-only request?<br/>Return valid + explanation; no SQL generation"]
         Classify -->|Accepted| Retrieve["retrieve · _retrieve<br/>Reuse schema and conversation snapshot<br/>Search up to 200 successful questions for this database<br/>Use hybrid keyword + semantic ranking for history<br/>Add up to 3 examples and build model messages"]
         Classify -->|Rejected or needs clarification| GraphEnd
-        Retrieve --> Generate["generate · _generate<br/>Call the chat model for SQL + explanation or clarification<br/>On revision, include previous SQL and correction feedback<br/>Increment attempts; clear the current review status"]
+        Retrieve --> Generate["generate · _generate<br/>Optional column values/profile tool calls<br/>Return SQL + explanation or clarification<br/>On revision, include previous SQL and correction feedback<br/>Increment attempts; clear the current review status"]
         Generate --> Validate["validate · _validate<br/>Skip SQLite if SQL is null<br/>Otherwise run EXPLAIN and record errors"]
         Validate -->|No SQL · clarification| GraphEnd([END · return proposal])
         Validate -->|Invalid · validation_repairs < max_repairs| Generate
         Validate -->|Invalid · repair budget exhausted| GraphEnd
-        Validate -->|Valid SQL| Critique["critique · _critique<br/>Same model, separate review instructions<br/>Full generator task context + proposed SQL + validation status<br/>Check intent, filters, joins, grouping, dates and ordering<br/>Return approved + actionable issues; increment critique_rounds"]
+        Validate -->|Valid SQL| Critique["critique · _critique<br/>Same model, separate review instructions<br/>Full generator task context + proposed SQL + validation status<br/>Optional column tools; reuse inspection evidence<br/>Check intent, filters, joins, grouping, dates and ordering<br/>Return approved + actionable issues; increment critique_rounds"]
         Critique -->|Approved| GraphEnd
         Critique -->|Rejected · critique_rounds < 3| Generate
         Critique -->|Rejected · 3 rounds reached| GraphEnd
@@ -28,8 +28,9 @@ flowchart TD
         Recheck --> Choice
         Choice -->|Enter / no| Skip([Skip · do not execute or save])
         Choice -->|Yes| Execute["Execute against source database<br/>read-only connection · 3-second limit · 500-row cap"]
-        Execute --> Save["On success, save question + SQL<br/>under database path and session ID"]
-        Save --> Results["Print result table"]
+        Execute -->|Success| Results["Print result table"]
+        Results --> Save["Save question + SQL under database/session<br/>Report any history-save error"]
+        Execute -->|Execution error · edit or skip| Choice
     end
 
     GraphEnd -->|SQL exists| Show
@@ -59,6 +60,7 @@ The PNG embedded in the README is generated from [sql-agent-flow.dot](sql-agent-
 | `generate` | `sql` (or `None`), `explanation`, `generation_messages`, incremented `attempts`; increments `validation_repairs` only when correcting a SQLite error; clears validation and current review status |
 | `validate` | Skips SQLite when `sql` is `None`; otherwise sets `validation_error` to `None` on success or to SQLite's error text on failure |
 | `critique` | Increments `critique_rounds`; sets `critique_approved` and `critique_issues`; retains findings in `critique_feedback` for revisions and any subsequent SQLite repairs |
+| Inspection inside `generate` / `critique` | Updates `tool_calls` (shared budget) and `inspection_results` (current-question evidence); neither is stored in conversation history |
 
 The classifier makes one model call per question with its own instructions. It returns `valid` (a boolean) and `explanation` (a nonempty string); malformed decisions stop the request with a readable error. Accepted input routes to retrieval, while rejected input routes directly to `END` with `sql: null`, zero generation attempts, and `retrieval_mode: none`. This supports arbitrary messages without a greeting list. The classifier uses the same configured model/provider as generation and critique; `classify_complete` allows a separate adapter to be injected programmatically.
 
@@ -66,6 +68,10 @@ The schema is read once per question and sent in full to classification and gene
 
 The critic receives the exact task messages used for the latest generation, including the question, full schema, history, examples, and any correction feedback. The generator's system instruction is replaced with the critic's own instructions. The proposal and validation status are supplied separately. It uses the same configured model and provider, but makes a separate call and evaluates correctness independently of the generator's explanation. Malformed reviews produce an error and return to the terminal prompt without offering execution.
 
-The default threshold of **3 counts critique reviews**, including the first one. Three rejections permit only two critique-driven revisions; the third rejection ends the graph and remains visible as unresolved issues. `SQL_MAX_REPAIRS=5` allows five additional revisions for SQLite errors across the whole question. Including the initial classification, these budgets allow at most one classifier call, eight generation calls, and three critique calls. Every SQL revision is validated again; a failed final revision has review status `None`, so an older review cannot appear to approve it.
+The default threshold of **3 counts critique reviews**, including the first one. Three rejections permit only two critique-driven revisions; the third rejection ends the graph and remains visible as unresolved issues. `SQL_MAX_REPAIRS=5` allows five additional revisions for SQLite errors across the whole question. These budgets allow at most one classifier decision, eight SQL proposals, and three critique reviews. Inspection can add up to four model continuations across those stages by default, for at most 16 model calls before transport retries. Every SQL revision is validated again; a failed final revision has review status `None`, so an older review cannot appear to approve it.
 
-The terminal approval step is outside LangGraph. A rejected proposal can still be edited, skipped, or explicitly approved by the user after seeing the issues; only a successful approved execution is written to history. Manual edits are not automatically critiqued and are labeled accordingly. Result rows are never sent to the critic.
+Column inspection happens inside generation and critique, not in separate LangGraph nodes. Both roles can request `get_column_values` or `get_column_profile` and receive correlated tool results before producing their final JSON. `SQL_MAX_TOOL_CALLS` controls their shared budget (default 4; 0 disables). Invalid requests count, and inspection evidence is reused across revisions. Each inspection is a read-only database operation with bounded output and a shared operation deadline. See [column inspection](column-inspection.md) for outputs, privacy, and limits.
+
+The terminal approval step is outside LangGraph. A rejected proposal can still be edited, skipped, or explicitly approved by the user after seeing the issues; only a successful approved execution is written to history. Manual edits are not automatically critiqued and are labeled accordingly. Final query result rows are never sent to the critic; bounded inspection values/statistics can be sent before the approval prompt.
+
+Generator and critic share one LIMIT/OFFSET policy: preserve requested or semantically necessary limits, and avoid arbitrary SQL caps on complete listings. The execution layer reports truncation separately. Execution errors return to the edit/approval choice; provider and database errors return to `Ask>`. Results remain visible if a subsequent history save fails.

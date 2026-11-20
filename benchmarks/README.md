@@ -62,11 +62,13 @@ Our coverage review used these references and added an explicit LIMIT/OFFSET cas
 
 ## Parallel model benchmark
 
-The parallel runner compares configured models on all **200 questions across 20 SQLite schemas**: 60 easy, 80 medium and 60 hard. A configuration with 10 models creates 2,000 model–question evaluations. Each evaluation normally makes classifier, generator and critic calls; SQL corrections, critique revisions and transport retries can add calls.
+The parallel runner compares configured models on all **200 questions across 20 SQLite schemas**: 60 easy, 80 medium and 60 hard. A configuration with 10 models creates 2,000 model–question evaluations. Each evaluation normally makes classifier, generator and critic calls; column-inspection continuations, SQL corrections, critique revisions and transport retries can add calls.
+
+Generator and critic can request [column values and profiles](../docs/column-inspection.md). The parallel configuration field `max_tool_calls` is their shared budget per case (default 4, permitted 0–20); it overrides the terminal's `SQL_MAX_TOOL_CALLS` environment setting. Set it to `0` for a comparison without tool access or for providers without function calling. Both runners record `tool_calls` for completed proposals, and parallel stage counts, usage, cost and latency include every tool-related model response. Tool schemas/choices are controlled by the application and cannot be overridden through `request_kwargs` or `extra_body`. The published November 19 snapshot predates these tools; use a new output directory for new measurements.
 
 Use the same model for all three roles within each configuration. Every case starts with its full schema and an empty history, so the benchmark makes no embedding requests and cannot reuse another case's approved SQL. Reference SQL and expected results stay outside model prompts. The score measures the application's full pipeline; the terminal's human approval step is excluded.
 
-Put model IDs, provider URLs, credential **environment variable names**, request settings and published token prices in `benchmarks/models.openai.json`. Do not put API keys in this file. The runner reads credentials from the environment or the project's `.env` file. Model-specific request settings override shared settings; `max_tokens` replaces `max_completion_tokens` when supplied. JSON response formatting is set by the runner.
+Put model IDs, provider URLs, credential **environment variable names**, request settings and published token prices in `benchmarks/models.openai.json`. Do not put API keys in this file. The runner reads credentials from the environment or the project's `.env` file. Model-specific request settings override shared settings. Supply exactly one of `max_tokens` or `max_completion_tokens`; conflicting limits, invalid budgets, and multiple completions are rejected before provider requests. JSON response formatting is set by the runner.
 
 From the project root, activate the project's Python environment and validate fixtures/configuration without making model requests:
 
@@ -89,7 +91,7 @@ python -m benchmarks.parallel \
 
 Worker limits control concurrent **cases**, not requests per minute. Adjust concurrency to the provider's limits. A pilot can use `--case-ids s01_q01 s01_q04 s01_q08` in the same output directory; the full command then fills the remaining cases. `--models` accepts configured labels or model IDs. The `--limit-cases N` option takes the first N dataset cases, not a random sample.
 
-Resume by repeating the same command; `--resume` is also accepted. Completed cases are skipped, while blocked/interrupted cases remain eligible. The runner fingerprints the model configuration, dataset, fixture SQL and application/evaluator sources. A changed fingerprint requires a new output directory. An interrupted run checkpoints completed in-flight work; no new model request starts after the runner's stop flag is observed.
+Resume by repeating the same command; `--resume` is also accepted. Completed cases are skipped, while blocked/interrupted cases remain eligible. The runner fingerprints the model configuration, dataset, fixture SQL, application/evaluator sources, and Python/SQLite/OpenAI/LangGraph runtime versions. A changed fingerprint requires a new output directory. Orphaned, foreign, and malformed checkpoints are rejected; only an unfinished final record is recoverable. An interrupted run checkpoints completed in-flight work; no new model request starts after the runner's stop flag is observed.
 
 Create the report locally, without further model calls:
 
@@ -118,3 +120,11 @@ The latest checkpoint record for each `(model label, case ID)` determines its ou
 The report distinguishes latency among all latest observed cases from latency among correct cases. It recomputes median/p95 with linear interpolation; these can differ from the runner summary's nearest-observation percentiles. End-to-end case timings include the pipeline and its corrections, exclude worker-queue waiting, and are affected by concurrency. SQL revisions are generation passes after the first, combining SQLite-error repairs and critic-requested rewrites; the current telemetry does not separate those causes.
 
 This is one run on small synthetic development fixtures, not a public Spider/BIRD score or proof of general SQL equivalence. It does not evaluate conversation follow-ups, hybrid history retrieval, or adversarial/unanswerable-input safety. Compare models at equal completed coverage; repeat runs before relying on small differences.
+
+## Reliability and historical results
+
+The parallel CLI exits with status `0` when the requested selection finishes (including model-quality failures), `1` when cases remain blocked, `2` for invalid inputs, and `130` when interrupted. A completed pilot succeeds even while the rest of the dataset remains pending.
+
+The checkpoint determines report outcomes and the cases file determines planned coverage. A stale summary cannot make a partial run look complete. Initialized runs can be reported before their first response; missing usage remains unknown, and complete corrupted records are reported rather than silently dropped.
+
+The published November 19 snapshot records the earlier application and evaluator at commit `abd74d8`. Preserve it and use a new output directory to evaluate the current fixes. Its recorded scores have not been rerun with the new code.

@@ -12,9 +12,9 @@ digraph SQLAgent {
     start [label="User message", shape=oval, fillcolor="#f2f2f2"];
     classify [label="1  CLASSIFY\nFull schema + last 6 successful session turns\nIs this an answerable read-only request?\nReturn valid + explanation; generate no SQL"];
     retrieve [label="2  RETRIEVE\nReuse schema and conversation\nRank up to 200 successful past questions\nKeyword + semantic search → up to 3 examples"];
-    generate [label="3  GENERATE\nFull context → SQL + explanation\nUse latest validation and critique feedback\nIncrement generation attempts"];
+    generate [label="3  GENERATE\nOptional column values/profile tools\nFull context + evidence → SQL + explanation\nUse latest validation and critique feedback\nIncrement generation attempts"];
     validate [label="4  VALIDATE\nCompile SQL with SQLite EXPLAIN\nCheck syntax, schema and permissions\nSkip SQLite when SQL is null"];
-    critique [label="5  CRITIQUE\nSeparate model call with generator task context\nCheck whether the SQL answers the question\nReturn approved + actionable issues"];
+    critique [label="5  CRITIQUE\nSeparate model call with generator task context\nOptional column tools; reuse inspection evidence\n4 inspections shared per question by default\nCheck whether the SQL answers the question\nReturn approved + actionable issues"];
     done [label="END · return proposal", shape=oval, fillcolor="#f2f2f2"];
 
     start -> classify;
@@ -38,7 +38,7 @@ digraph SQLAgent {
     edit [label="Read replacement SQL\nLabel it unreviewed by critic\nAsk for approval again"];
     skip [label="Skip · return to Ask>", fillcolor="#f2f2f2"];
     execute [label="Execute against source database\nRead-only · 3-second limit · 500-row cap"];
-    save [label="On successful execution\nSave question + SQL under database/session\nPrint results · return to Ask>", fillcolor="#e8f4e8", color="#538255"];
+    save [label="On successful execution: print results\nThen save question + SQL under database/session\nReport history-save errors · return to Ask>", fillcolor="#e8f4e8", color="#538255"];
 
     review -> approve;
     approve -> edit [label="edit"];
@@ -46,6 +46,7 @@ digraph SQLAgent {
     approve -> skip [label="Enter / no"];
     approve -> execute [label="yes"];
     execute -> save;
+    execute -> approve [label="Execution error\nEdit or skip", constraint=false, color="#b66a3c"];
   }
   done -> reply [label="sql is null"];
   done -> review [label="SQL exists"];

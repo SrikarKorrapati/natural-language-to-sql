@@ -417,15 +417,15 @@ def test_terminal_edit_requires_fresh_approval(agent, monkeypatch, capsys, appro
         assert agent.history.successful() == []
 
 
-def test_terminal_does_not_remember_failed_execution(agent, monkeypatch):
+def test_terminal_does_not_remember_failed_execution(agent, monkeypatch, capsys):
     from app.main import run_question
 
     before = agent.database.execute("SELECT COUNT(*) FROM customers")["rows"]
     # Approval cannot bypass SQLite's read-only checks, even for manually edited SQL.
     answers = iter(["edit", "DELETE FROM customers", "", "yes", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
-    with pytest.raises(sqlite3.Error):
-        run_question(agent, "List customers", "session-one", "test-model")
+    run_question(agent, "List customers", "session-one", "test-model")
+    assert "Could not execute SQL" in capsys.readouterr().out
     assert agent.history.successful() == []
     assert agent.database.execute("SELECT COUNT(*) FROM customers")["rows"] == before
 
@@ -439,3 +439,141 @@ def test_terminal_displays_nonfinite_numbers_and_blobs(source, capsys):
     print_result(result)
     output = capsys.readouterr().out
     assert "positive" in output and "inf" in output and "ff" in output
+
+
+def test_schema_keeps_user_tables_with_sqlite_prefix(source):
+    with sqlite3.connect(source.path) as connection:
+        connection.executescript("""
+            CREATE TABLE sqliteanalytics(id INTEGER PRIMARY KEY AUTOINCREMENT);
+            CREATE VIEW sqliteaudit AS SELECT id FROM sqliteanalytics;
+        """)
+    names = {table["name"] for table in source.schema()}
+    assert {"sqliteanalytics", "sqliteaudit"} <= names
+    assert "sqlite_sequence" not in names
+
+
+@pytest.mark.parametrize("hardlink", [False, True])
+def test_history_cannot_modify_the_source_database(source, tmp_path, hardlink):
+    target = source.path
+    if hardlink:
+        target = tmp_path / "journal-alias.db"
+        target.hardlink_to(source.path)
+    before = source.path.read_bytes()
+    with pytest.raises(ValueError, match="different file"):
+        History(target, dataset=str(source.path))
+    assert source.path.read_bytes() == before
+    assert "queries" not in {table["name"] for table in source.schema()}
+
+
+@pytest.mark.parametrize("sql", ["", "  ", "-- no query\n", "/* no query */", ";"])
+def test_empty_sql_fails_as_a_database_error(source, sql):
+    with pytest.raises(sqlite3.Error):
+        source.validate(sql)
+    with pytest.raises(sqlite3.Error):
+        source.execute(sql)
+
+
+@pytest.mark.parametrize("settings", [
+    {"max_rows": 0}, {"max_rows": -1}, {"max_rows": 1.5}, {"max_rows": True},
+    {"timeout_seconds": 0}, {"timeout_seconds": -1},
+    {"timeout_seconds": float("inf")}, {"timeout_seconds": float("nan")},
+])
+def test_database_rejects_invalid_resource_limits(source, settings):
+    with pytest.raises(ValueError):
+        Database(source.path, **settings)
+
+
+def test_failed_execution_can_be_edited_and_approved_again(agent, monkeypatch, capsys):
+    from app.main import run_question
+
+    fixed = "SELECT COUNT(*) AS count FROM customers"
+    answers = iter(["edit", "SELECT absent FROM customers", "", "y", "edit", fixed, "", "y"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    run_question(agent, "Count customers", "session", "model")
+    assert "Could not execute SQL" in capsys.readouterr().out
+    assert [row["sql"] for row in agent.history.successful()] == [fixed]
+
+
+@pytest.mark.parametrize("kind", ["configuration", "connection", "rate_limit"])
+def test_chat_recovers_from_provider_errors_without_printing_private_details(
+    agent, monkeypatch, capsys, kind
+):
+    from openai import APIConnectionError, APIStatusError, OpenAIError
+    from app.main import chat
+
+    request = httpx.Request("POST", "https://provider.test/v1/chat/completions")
+    errors = {
+        "configuration": OpenAIError("PRIVATE_PROVIDER_DETAIL"),
+        "connection": APIConnectionError(message="PRIVATE_PROVIDER_DETAIL", request=request),
+        "rate_limit": APIStatusError("PRIVATE_PROVIDER_DETAIL", response=httpx.Response(429, request=request), body=None),
+    }
+    generate = agent.complete
+    attempts = []
+
+    def complete(*args):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise errors[kind]
+        return generate(*args)
+
+    agent.complete = complete
+    answers = iter(["List customers", "List customers", "y", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    chat(agent, "session", "model")
+    output = capsys.readouterr().out
+    assert "Model provider request failed" in output
+    assert "PRIVATE_PROVIDER_DETAIL" not in output
+    assert len(agent.history.successful()) == 1
+
+
+def test_chat_recovers_from_schema_command_error(agent, monkeypatch, capsys):
+    from app.main import chat
+
+    schema = agent.database.schema
+    calls = []
+
+    def read_schema():
+        calls.append(1)
+        if len(calls) == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return schema()
+
+    monkeypatch.setattr(agent.database, "schema", read_schema)
+    answers = iter(["/schema", "List customers", "y", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    chat(agent, "session", "model")
+    assert "Database error: database is locked" in capsys.readouterr().out
+    assert len(agent.history.successful()) == 1
+
+
+def test_history_save_failure_keeps_successful_results_visible(agent, monkeypatch, capsys):
+    from app.main import run_question
+
+    def fail_save(*_):
+        raise sqlite3.OperationalError("database or disk is full")
+
+    monkeypatch.setattr(agent.history, "save", fail_save)
+    monkeypatch.setattr("builtins.input", lambda *_: "y")
+    run_question(agent, "List customers", "session", "model")
+    output = capsys.readouterr().out
+    assert "rows in" in output
+    assert "Query ran, but conversation history could not be saved" in output
+    assert agent.history.successful() == []
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_startup_rejects_missing_or_invalid_databases_before_creating_history(
+    tmp_path, monkeypatch, capsys, exists
+):
+    import app.main as main_module
+
+    path = tmp_path / "source.db"
+    if exists:
+        path.write_text("This is not a SQLite database")
+    monkeypatch.setattr(main_module, "ROOT", tmp_path)
+    monkeypatch.setattr(main_module, "SQLAgent", lambda *_: pytest.fail("Invalid database must not start an agent"))
+    with pytest.raises(SystemExit) as exc:
+        main_module.main(["--database", str(path)])
+    assert exc.value.code == 2
+    assert "Cannot start" in capsys.readouterr().err
+    assert not (tmp_path / "data" / "history.db").exists()

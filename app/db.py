@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import sqlite3
 import time
 from contextlib import closing
@@ -13,6 +14,15 @@ class Database:
     """Inspect and query an existing SQLite database without allowing changes."""
 
     def __init__(self, path: Path, max_rows: int = 500, timeout_seconds: float = 3):
+        if type(max_rows) is not int or max_rows < 1:
+            raise ValueError("max_rows must be a positive integer")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be positive and finite")
         self.path = Path(path).resolve()
         self.max_rows = max_rows
         self.timeout_seconds = timeout_seconds
@@ -27,7 +37,7 @@ class Database:
             # sqlite_master stores each table or view's CREATE statement.
             tables = conn.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') "
-                "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                "AND name NOT GLOB 'sqlite_*' ORDER BY name"
             ).fetchall()
             return [{"name": name, "sql": sql} for name, sql in tables]
 
@@ -55,6 +65,8 @@ class Database:
         return sqlite3.SQLITE_OK
 
     def _run(self, sql: str, validate: bool = False) -> dict:
+        if not sql.strip():
+            raise sqlite3.OperationalError("Enter a nonempty read-only SQL query.")
         started = time.perf_counter()
         with closing(self.connect()) as conn:
             # Apply read-only rules and size limits to validation and execution alike.
@@ -71,6 +83,8 @@ class Database:
             cursor = conn.execute(("EXPLAIN " if validate else "") + sql)
             if validate:
                 return {}
+            if cursor.description is None:
+                raise sqlite3.OperationalError("The SQL statement returned no result columns.")
             # Fetch one extra row to detect truncation without loading every result.
             rows = cursor.fetchmany(self.max_rows + 1)
             return {
@@ -94,6 +108,11 @@ class History:
     def __init__(self, path: Path, dataset: str):
         # The caller uses the source database's absolute path as its dataset identifier.
         self.path, self.dataset = Path(path), dataset
+        source = Path(dataset)
+        if self.path.resolve() == source.resolve() or (
+            self.path.exists() and source.exists() and self.path.samefile(source)
+        ):
+            raise ValueError("Conversation history must use a different file from the source database.")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path)) as conn, conn:
             conn.execute("""

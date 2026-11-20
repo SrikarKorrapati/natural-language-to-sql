@@ -7,10 +7,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
 import hashlib
+from importlib.metadata import version
 import json
+import math
 import os
 from pathlib import Path
 import random
+import sqlite3
+import sys
 import tempfile
 import threading
 import time
@@ -18,10 +22,15 @@ from urllib.parse import urlsplit
 from dotenv import load_dotenv
 from openai import APIConnectionError, APIStatusError, OpenAI
 from app.agent import ModelResponseError, SQLAgent
+from app.completion import parse_model_response
 from app.db import History
 from app.retrieval import Retriever
-from benchmarks.run import SCHEMAS, load_database, rows_equal
+from benchmarks.run import SCHEMAS, load_database, rows_equal, validate_cases
 ROOT = SCHEMAS.parent.parent
+
+
+class ProviderConfigurationError(ValueError):
+    """The SDK could not construct the configured request."""
 
 
 def now():
@@ -29,56 +38,115 @@ def now():
 
 
 def normalize_config(raw):
-    if not isinstance(raw, dict) or not raw.get('models'):
+    if not isinstance(raw, dict) or not isinstance(raw.get('models'), list) or not raw['models']:
         raise ValueError('Config requires a nonempty models list')
     config = {key: raw.get(key, default) for key, default in (
-        ('max_repairs', 5), ('max_critiques', 3), ('request_timeout_seconds', 120), ('transport_retries', 2))}
-    if config['max_repairs'] < 0 or config['max_critiques'] < 1 or config['request_timeout_seconds'] <= 0 or not 0 <= config['transport_retries'] <= 10:
-        raise ValueError('Invalid timeout or retry/review budget')
+        ('max_repairs', 5), ('max_critiques', 3), ('max_tool_calls', 4),
+        ('request_timeout_seconds', 120), ('transport_retries', 2))}
+    for key, minimum in (('max_repairs', 0), ('max_critiques', 1), ('max_tool_calls', 0), ('transport_retries', 0)):
+        if type(config[key]) is not int or config[key] < minimum:
+            raise ValueError(f'{key} must be an integer of at least {minimum}')
+    if config['transport_retries'] > 10:
+        raise ValueError('transport_retries must be at most 10')
+    if config['max_tool_calls'] > 20:
+        raise ValueError('max_tool_calls must be at most 20')
+    timeout = config['request_timeout_seconds']
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError('request_timeout_seconds must be a positive finite number')
+    if not isinstance(raw.get('request_kwargs', {}), dict):
+        raise ValueError('request_kwargs must be an object')
     config['models'] = []
     for item in raw['models']:
-        model_id = item['model_id']
+        if not isinstance(item, dict) or not isinstance(item.get('provider'), dict):
+            raise ValueError('Each model requires a provider object')
+        model_id = item.get('model_id')
         provider = item['provider']
         label = item.get('label', model_id)
-        url, key_env = provider['base_url'], provider['key_env']
-        parsed = urlsplit(url)
-        if not model_id or not label or parsed.scheme not in {'https', 'http'} or not parsed.netloc or parsed.username or parsed.password or parsed.query:
+        url, key_env = provider.get('base_url'), provider.get('key_env')
+        if any(not isinstance(value, str) or not value.strip() for value in (model_id, label, url, key_env)):
+            raise ValueError('Model ID, label, provider URL, and key_env must be nonempty strings')
+        try:
+            parsed = urlsplit(url)
+            valid_url = (parsed.scheme in {'https', 'http'} and parsed.hostname
+                         and not (parsed.username or parsed.password or parsed.query or parsed.fragment))
+            parsed.port  # Validate a supplied port before constructing the SDK client.
+        except ValueError:
+            valid_url = False
+        if not valid_url or any(char.isspace() for char in url):
             raise ValueError('Invalid model or provider URL')
         if not key_env.isidentifier():
             raise ValueError('key_env must name an environment variable')
-        kwargs = {'max_completion_tokens': 4096, **raw.get('request_kwargs', {}), **item.get('request_kwargs', {})}
-        if {'api_key','base_url','messages','model','stream','response_format','extra_headers'}.intersection(kwargs):
+        if not isinstance(item.get('request_kwargs', {}), dict):
+            raise ValueError('request_kwargs must be an object')
+        kwargs = {**raw.get('request_kwargs', {}), **item.get('request_kwargs', {})}
+        reserved = {'api_key','base_url','messages','model','stream','response_format','extra_headers','timeout',
+                    'tools','tool_choice','parallel_tool_calls','functions','function_call'}
+        if reserved.intersection(kwargs):
             raise ValueError('Reserved request_kwargs')
-        if 'max_tokens' in kwargs:
-            kwargs.pop('max_completion_tokens', None)
+        if 'extra_body' in kwargs and (not isinstance(kwargs['extra_body'], dict)
+                or reserved.union({'max_tokens', 'max_completion_tokens', 'n'}).intersection(kwargs['extra_body'])):
+            raise ValueError('extra_body cannot override benchmark request fields')
+        if 'max_tokens' in kwargs and 'max_completion_tokens' in kwargs:
+            raise ValueError('Specify only one completion token limit')
+        if 'max_tokens' not in kwargs:
+            kwargs.setdefault('max_completion_tokens', 4096)
+        for key in ('max_tokens', 'max_completion_tokens'):
+            if key in kwargs and (type(kwargs[key]) is not int or kwargs[key] <= 0):
+                raise ValueError(f'{key} must be a positive integer')
+        if kwargs.get('n', 1) != 1 or type(kwargs.get('n', 1)) is not int:
+            raise ValueError('The benchmark requires exactly one completion (n=1)')
+        pricing = item.get('pricing', {})
+        if not isinstance(pricing, dict) or any(
+            value is not None and (type(value) not in (int, float) or not math.isfinite(value) or value < 0)
+            for value in pricing.values()
+        ):
+            raise ValueError('Pricing must contain nonnegative finite numbers or null')
+        try:
+            json.dumps(kwargs, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('request_kwargs must contain finite JSON values') from exc
         config['models'].append({'model_id': model_id, 'label': label,
             'provider': {'base_url': url.rstrip('/'), 'key_env': key_env},
-            'request_kwargs': kwargs, 'pricing': item.get('pricing', {})})
+            'request_kwargs': kwargs, 'pricing': pricing})
     if len({m['label'] for m in config['models']}) != len(config['models']):
         raise ValueError('Model labels must be unique')
     return config
 
 
 def fingerprint(config, cases):
-    paths = list((ROOT / 'app').glob('*.py')) + [SCHEMAS.parent / 'run.py']
+    paths = list((ROOT / 'app').rglob('*.py')) + [SCHEMAS.parent / 'run.py']
     paths += [SCHEMAS / (name + '.sql') for name in sorted({c['schema_id'] for c in cases})]
     hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     hashes['benchmarks/parallel.py'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    data = json.dumps({'version': 1, 'config': config, 'cases': cases, 'code': hashes}, sort_keys=True)
+    runtime = {'python': sys.version, 'sqlite': sqlite3.sqlite_version,
+               'openai': version('openai'), 'langgraph': version('langgraph')}
+    data = json.dumps({'version': 2, 'config': config, 'cases': cases, 'code': hashes,
+                       'runtime': runtime}, sort_keys=True)
     return hashlib.sha256(data.encode()).hexdigest(), hashes
 
 
 def error_record(exc, secret=''):
     status = getattr(exc, 'status_code', None)
+    category = 'execution'
     if isinstance(exc, (APIStatusError, APIConnectionError)):
         message = 'Provider request failed' + (f' (HTTP {status})' if status else ' (connection/timeout)')
+        category = ('provider_connection' if status is None else
+                    'provider_auth' if status in (401, 403) else
+                    'provider_rate_limit' if status == 429 else
+                    'provider_unavailable' if status >= 500 else 'provider_request')
     elif isinstance(exc, InterruptedError):
         message = 'Run interrupted before the next model request'
+        category = 'interrupted'
+    elif isinstance(exc, ProviderConfigurationError):
+        message = 'Invalid provider request configuration'
+        category = 'provider_configuration'
     else:
         message = str(exc)[:500]
+        if isinstance(exc, ModelResponseError):
+            category = 'model_response'
     if secret:
         message = message.replace(secret, '[REDACTED]')
-    return {'type': type(exc).__name__, 'status_code': status, 'message': message}
+    return {'type': type(exc).__name__, 'status_code': status, 'category': category, 'message': message}
 
 
 def usage_record(response, pricing):
@@ -112,9 +180,14 @@ class Recorder:
             timeout=config['request_timeout_seconds'], max_retries=0)
 
     def callback(self, stage):
-        def complete(model_id, messages):
+        def complete(model_id, messages, *, tools=None, tool_choice=None):
             self.stage_calls[stage] += 1
             logical_call = sum(self.stage_calls.values())
+            tool_kwargs = {}
+            if tools:
+                tool_kwargs['tools'] = tools
+                if tool_choice is not None:
+                    tool_kwargs['tool_choice'] = tool_choice
             for attempt in range(self.config['transport_retries'] + 1):
                 if self.stop.is_set():
                     raise InterruptedError()
@@ -123,13 +196,15 @@ class Recorder:
                     'started_at': now(), 'requested_model': model_id}
                 try:
                     response = self.client.chat.completions.create(model=model_id, messages=messages,
-                        response_format={'type':'json_object'}, **self.model['request_kwargs'])
+                        response_format={'type':'json_object'}, **tool_kwargs, **self.model['request_kwargs'])
                 except Exception as exc:
                     record.update(service_latency_ms=round((time.perf_counter()-started)*1000,2),
                         succeeded=False, error=error_record(exc, self.key))
                     self.calls.append(record)
+                    if isinstance(exc, (TypeError, ValueError)):
+                        raise ProviderConfigurationError() from exc
                     status = getattr(exc, 'status_code', None)
-                    transient = isinstance(exc, APIConnectionError) or isinstance(exc, APIStatusError) and (status == 429 or status >= 500)
+                    transient = isinstance(exc, APIConnectionError) or isinstance(exc, APIStatusError) and (status in (408, 409, 429) or status >= 500)
                     if not transient or attempt == self.config['transport_retries']:
                         raise
                     delay = min(8, 0.5 * 2**attempt + random.uniform(0,0.25))
@@ -140,39 +215,44 @@ class Recorder:
                     if self.stop.wait(delay):
                         raise InterruptedError()
                     continue
-                finish_reason = response.choices[0].finish_reason if response.choices else None
+                finish_reason = (getattr(response.choices[0], 'finish_reason', None)
+                    if isinstance(response.choices, list) and response.choices else None)
                 record.update(service_latency_ms=round((time.perf_counter()-started)*1000,2),
                     succeeded=True, response_id=response.id, response_model=response.model,
                     finish_reason=finish_reason,
                     usage=usage_record(response, self.model['pricing']))
                 self.calls.append(record)
-                if finish_reason == 'length':
-                    raise ModelResponseError('The model response was truncated at the completion token limit (finish_reason=length).')
-                try:
-                    return json.loads(response.choices[0].message.content)
-                except (json.JSONDecodeError, TypeError, IndexError) as exc:
-                    raise ModelResponseError('The model returned an unreadable JSON answer.') from exc
+                return parse_model_response(response, allow_tools=bool(tools) and tool_choice != 'none')
+        complete.supports_tools = True
         return complete
 
 
-def evaluate(model, case, database, expected, history_path, config, stop, client_factory):
-    result = {'model':model['label'], 'model_id':model['model_id'], 'id':case['id'],
+def initial_result(model, case):
+    return {'model':model['label'], 'model_id':model['model_id'], 'id':case['id'],
         'schema_id':case['schema_id'], 'difficulty':case.get('difficulty'), 'question':case['question'],
         'status':'completed', 'valid_sql':False, 'correct':False, 'attempts':0, 'sql':None,
         'retrieval_mode':None, 'input_valid':None, 'classification_explanation':None,
-        'critique_rounds':0, 'critique_approved':None, 'critique_issues':[], 'error':None, 'started_at':now()}
+        'critique_rounds':0, 'critique_approved':None, 'critique_issues':[], 'tool_calls':0,
+        'error':None, 'started_at':now()}
+
+
+def evaluate(model, case, database, expected, history_path, config, stop, client_factory):
+    result = initial_result(model, case)
     recorder = None
+    setup_complete = False
     started = time.perf_counter()
     try:
         history = History(history_path, dataset=str(database.path))
         recorder = Recorder(model, config, stop, client_factory)
         agent = SQLAgent(database, history, complete=recorder.callback('generate'),
             classify_complete=recorder.callback('classify'), critique_complete=recorder.callback('critique'),
-            retriever=Retriever(), max_repairs=config['max_repairs'], max_critiques=config['max_critiques'])
+            retriever=Retriever(), max_repairs=config['max_repairs'], max_critiques=config['max_critiques'],
+            max_tool_calls=config['max_tool_calls'])
+        setup_complete = True
         started = time.perf_counter()
         proposal = agent.propose(case['question'], 'benchmark', model['model_id'])
         for field in ('sql','attempts','retrieval_mode','input_valid','classification_explanation',
-                      'critique_rounds','critique_approved','critique_issues'):
+                      'critique_rounds','critique_approved','critique_issues','tool_calls'):
             result[field] = proposal.get(field)
         if proposal['sql'] is None:
             raise ValueError('No SQL generated: ' + proposal['explanation'])
@@ -184,12 +264,18 @@ def evaluate(model, case, database, expected, history_path, config, stop, client
         result['correct'] = len(actual['columns']) == len(expected['columns']) and rows_equal(
             actual['rows'], expected['rows'], case.get('order_sensitive',False))
     except Exception as exc:
-        result['error'] = error_record(exc, recorder.key if recorder else '')
-        if isinstance(exc, (APIStatusError, APIConnectionError)):
+        result['error'] = error_record(exc, os.environ.get(model['provider']['key_env'], ''))
+        if isinstance(exc, (APIStatusError, APIConnectionError, ProviderConfigurationError)):
             # Infrastructure failures remain resumable, excluded from model accuracy.
             result['status'] = 'blocked'
         elif isinstance(exc, InterruptedError):
             result['status'] = 'interrupted'
+        elif not setup_complete:
+            result['status'] = 'blocked'
+            result['error']['category'] = 'worker_setup'
+        elif not isinstance(exc, (ModelResponseError, sqlite3.Error, ValueError)):
+            result['status'] = 'blocked'
+            result['error']['category'] = 'worker_failure'
     finally:
         result['latency_ms'] = round((time.perf_counter()-started)*1000,2)
         result['finished_at'] = now()
@@ -197,7 +283,11 @@ def evaluate(model, case, database, expected, history_path, config, stop, client
         result['stage_calls'] = dict(recorder.stage_calls) if recorder else {}
         result['http_attempts'] = len(result['calls'])
         if recorder:
-            recorder.client.close()
+            try:
+                recorder.client.close()
+            except Exception as exc:
+                # A cleanup failure must not discard paid responses and their usage.
+                result['cleanup_error'] = error_record(exc, recorder.key)
     return result
 
 
@@ -234,12 +324,46 @@ def read_records(path):
                     handle.seek(0, 2)
                     handle.write(b'\n')
             except (json.JSONDecodeError, UnicodeDecodeError):
-                if handle.read():
-                    raise ValueError('Checkpoint corruption before final record')
+                if line.endswith(b'\n') or handle.read():
+                    raise ValueError('Checkpoint corruption in a complete record')
                 handle.seek(offset)
                 handle.truncate()
                 break
     return records
+
+
+def validate_records(records, config, cases):
+    """Do not skip paid work based on a foreign or malformed checkpoint."""
+    models = {model['label']: model['model_id'] for model in config['models']}
+    schemas = {case['id']: case['schema_id'] for case in cases}
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError('Checkpoint records must be objects')
+        label, case_id = record.get('model'), record.get('id')
+        if (not isinstance(label, str) or label not in models
+                or not isinstance(case_id, str) or case_id not in schemas
+                or record.get('model_id') != models[label]
+                or record.get('schema_id') != schemas[case_id]):
+            raise ValueError('Checkpoint contains an unknown model or case')
+        if (not isinstance(record.get('status'), str)
+                or record['status'] not in {'completed', 'blocked', 'interrupted'}
+                or any(type(record.get(field)) is not bool for field in ('correct', 'valid_sql'))
+                or 'input_valid' not in record
+                or (record['input_valid'] is not None and type(record['input_valid']) is not bool)
+                or type(record.get('latency_ms')) not in (int, float)
+                or not math.isfinite(record['latency_ms']) or record['latency_ms'] < 0
+                or not isinstance(record.get('calls'), list)
+                or any(not isinstance(call, dict) for call in record['calls'])):
+            raise ValueError('Checkpoint contains a malformed result')
+        for call in record['calls']:
+            usage = call.get('usage')
+            if usage is not None and (not isinstance(usage, dict) or any(
+                usage.get(field) is not None and (type(usage[field]) not in (int, float)
+                    or not math.isfinite(usage[field]) or usage[field] < 0)
+                for field in ('input_tokens', 'output_tokens', 'cached_input_tokens', 'reasoning_tokens',
+                              'provider_cost_usd', 'estimated_cost_usd')
+            )):
+                raise ValueError('Checkpoint contains malformed usage')
 
 
 def aggregate(config, cases, records, identity, interrupted=False, blocked=()):
@@ -279,10 +403,9 @@ def aggregate(config, cases, records, identity, interrupted=False, blocked=()):
 def run_parallel(raw_config, cases, output_dir, *, model_names=None, limit_cases=None, case_ids=None,
                  workers=24, per_model_workers=3, dry_run=False, client_factory=OpenAI, progress=print):
     config = normalize_config(raw_config)
-    if workers < 1 or per_model_workers < 1:
+    if type(workers) is not int or type(per_model_workers) is not int or workers < 1 or per_model_workers < 1:
         raise ValueError('Worker limits must be positive')
-    if not cases or len({c['id'] for c in cases}) != len(cases):
-        raise ValueError('Cases must be nonempty with unique IDs')
+    validate_cases(cases)
     requested = set(model_names or [])
     models = [m for m in config['models'] if not requested or m['label'] in requested or m['model_id'] in requested]
     if requested - {name for m in models for name in (m['label'],m['model_id'])}:
@@ -291,18 +414,21 @@ def run_parallel(raw_config, cases, output_dir, *, model_names=None, limit_cases
     if case_ids and set(case_ids) - {c['id'] for c in cases}:
         raise ValueError('Unknown --case-ids entry')
     if limit_cases is not None:
-        if limit_cases < 1:
+        if type(limit_cases) is not int or limit_cases < 1:
             raise ValueError('--limit-cases must be positive')
         selected = selected[:limit_cases]
     identity, hashes = fingerprint(config, cases)
     output_dir = Path(output_dir)
     with locked_output(output_dir), tempfile.TemporaryDirectory(prefix='nl2sql-parallel-') as temp:
         manifest_path = output_dir / 'manifest.json'
+        checkpoint_path = output_dir / 'cases.jsonl'
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text())
             if manifest['fingerprint'] != identity:
                 raise ValueError('Resume refused: config/source/dataset changed; use a new output directory')
         else:
+            if checkpoint_path.exists() and checkpoint_path.stat().st_size:
+                raise ValueError('Resume refused: checkpoint has no manifest; use a new output directory')
             manifest = {'created_at':now(), 'fingerprint':identity, 'config':config,
                 'source_hashes':hashes, 'dataset_cases':len(cases), 'launches':[]}
         manifest['launches'].append({'at':now(), 'workers':workers, 'per_model_workers':per_model_workers,
@@ -316,21 +442,27 @@ def run_parallel(raw_config, cases, output_dir, *, model_names=None, limit_cases
             if result['truncated']:
                 raise ValueError('Truncated reference: ' + case['id'])
             expected[case['id']] = result
-        checkpoint_path = output_dir / 'cases.jsonl'
         records = read_records(checkpoint_path)
+        validate_records(records, config, cases)
         latest = {(r['model'],r['id']):r for r in records}
-        pending = {m['label']:iter([c for c in selected if (m['label'],c['id']) not in latest or latest[(m['label'],c['id'])]['status'] != 'completed']) for m in models}
+        pending_cases = {m['label']:[c for c in selected if (m['label'],c['id']) not in latest or latest[(m['label'],c['id'])]['status'] != 'completed'] for m in models}
         if dry_run:
             plan = {'fingerprint':identity, 'models':len(models), 'cases_per_model':len(selected),
-                'pending_cases':sum(len(list(it)) for it in pending.values()),
+                'pending_cases':sum(len(items) for items in pending_cases.values()),
                 'schemas_validated':len(databases), 'references_validated':len(expected), 'dry_run':True}
             atomic_json(output_dir / 'dry-run.json',plan)
             return plan
-        missing = sorted({m['provider']['key_env'] for m in models if not os.environ.get(m['provider']['key_env'])})
+        missing = sorted({m['provider']['key_env'] for m in models if pending_cases[m['label']] and not os.environ.get(m['provider']['key_env'])})
         if missing:
             raise ValueError('Missing credential environment variables: ' + ', '.join(missing))
-        return schedule(config,cases,models,pending,databases,expected,root,records,checkpoint_path,output_dir,
-            identity,workers,per_model_workers,client_factory,progress)
+        report = schedule(config,cases,models,{label:iter(items) for label,items in pending_cases.items()},
+            databases,expected,root,records,checkpoint_path,output_dir,identity,workers,per_model_workers,
+            client_factory,progress)
+        wanted = {case['id'] for case in selected}
+        report['selection_complete'] = all(wanted <= {r['id'] for r in report['models'][model['label']]['results']}
+                                           for model in models)
+        atomic_json(output_dir / 'results.json', report)
+        return report
 
 
 def schedule(config,cases,models,pending,databases,expected,root,records,checkpoint_path,output_dir,
@@ -358,15 +490,24 @@ def schedule(config,cases,models,pending,databases,expected,root,records,checkpo
                     token = hashlib.sha256((label + '\0' + case['id']).encode()).hexdigest()[:24]
                     future = pool.submit(evaluate,model,case,databases[case['schema_id']],expected[case['id']],
                         root / ('history-' + token + '.db'),config,stop,client_factory)
-                    running[future] = label
+                    running[future] = (model, case, time.perf_counter())
                     active[label] += 1
                 if not running:
                     break
                 finished,_ = wait(running,timeout=.25,return_when=FIRST_COMPLETED)
                 for future in finished:
-                    label = running.pop(future)
+                    model, case, started = running.pop(future)
+                    label = model['label']
                     active[label] -= 1
-                    record = future.result()
+                    try:
+                        record = future.result()
+                    except Exception as exc:
+                        # Preserve other in-flight results if a worker itself crashes.
+                        record = initial_result(model, case)
+                        record.update(status='blocked', finished_at=now(), calls=[], stage_calls={},
+                                      http_attempts=0, latency_ms=round((time.perf_counter()-started)*1000, 2),
+                                      error=error_record(exc, os.environ.get(model['provider']['key_env'], '')))
+                        record['error']['category'] = 'worker_failure'
                     records.append(record)
                     checkpoint.write(json.dumps(record,ensure_ascii=False) + '\n')
                     checkpoint.flush()
@@ -400,9 +541,12 @@ def main(argv=None):
     parser.add_argument('--dry-run',action='store_true')
     parser.add_argument('--resume',action='store_true',help='Resume is automatic; flag accepted for clarity')
     args = parser.parse_args(argv)
-    report = run_parallel(json.loads(args.config.read_text()),json.loads(args.cases.read_text()),args.output_dir,
-        model_names=args.models,limit_cases=args.limit_cases,case_ids=args.case_ids,workers=args.workers,
-        per_model_workers=args.per_model_workers,dry_run=args.dry_run)
+    try:
+        report = run_parallel(json.loads(args.config.read_text()),json.loads(args.cases.read_text()),args.output_dir,
+            model_names=args.models,limit_cases=args.limit_cases,case_ids=args.case_ids,workers=args.workers,
+            per_model_workers=args.per_model_workers,dry_run=args.dry_run)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
     if args.dry_run:
         print(json.dumps(report,indent=2))
     else:
@@ -411,7 +555,10 @@ def main(argv=None):
             score = f'{value:.1%}' if value is not None else 'pending'
             print(f"{label}: {summary['completed_cases']}/{summary['total_cases']} cases; accuracy {score}")
         print(f"Results: {args.output_dir / 'results.json'}")
+    if report.get('interrupted'):
+        return 130
+    return 0 if args.dry_run or report.get('selection_complete') else 1
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

@@ -6,6 +6,8 @@ TF-IDF has several variations. This comparison uses TF-IDF-weighted query and do
 
 Here, the query is the search text, and each document is one candidate past question.
 
+Tokenization lowercases ASCII words and numbers, drops one-character words, and removes at most one final `s` from words longer than two characters unless they end in `ss`. This preserves terms such as `class` and avoids empty tokens, but remains a simple heuristic rather than linguistic stemming.
+
 | Behavior | Current `keyword_rank` | TF-IDF with cosine similarity | BM25 |
 | --- | --- | --- | --- |
 | Word rarity | IDF gives rarer words more weight | IDF gives rarer words more weight | IDF gives rarer words more weight |
