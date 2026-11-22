@@ -1,12 +1,16 @@
 """Equal-weight BM25 and semantic retrieval for successful past questions."""
 
+import json
 import math
 import os
 import re
 import sys
 from collections import Counter
+from pathlib import Path
 
 from openai import OpenAI
+
+from app.vector_store import QdrantHistoryIndex
 
 
 BM25_K1 = 1.2
@@ -57,10 +61,11 @@ def keyword_rank(query: str, texts: list[str]) -> list[int]:
 
 
 class Retriever:
-    """Combine BM25 with fresh embeddings for each history search."""
+    """Combine BM25 with semantic search, optionally backed by a vector index."""
 
-    def __init__(self, embed=None):
+    def __init__(self, embed=None, vector_index: QdrantHistoryIndex | None = None):
         self.embed = embed
+        self.vector_index = vector_index
 
     def rank(self, query: str, texts: list[str], limit: int) -> tuple[list[int], str]:
         """Return ranked text indexes and the retrieval mode actually used."""
@@ -72,35 +77,16 @@ class Retriever:
         if self.embed is None:
             return keyword[:limit], "keyword"
         try:
-            # Embed the search and all candidates; keep vectors local to this call.
-            vectors = self.embed([query, *texts])
-            if len(vectors) != len(texts) + 1:
-                raise ValueError("Embedding count does not match inputs")
-            normalized = []
-            for vector in vectors:
-                norm = math.hypot(*vector)
-                if not norm or not math.isfinite(norm):
-                    raise ValueError("Embedding must be finite and nonzero")
-                if len(vector) != len(vectors[0]):
-                    raise ValueError("Embedding dimensions do not match")
-                # Unit-length vectors make their dot product equal cosine similarity.
-                normalized.append([value / norm for value in vector])
+            semantic = self._semantic_rank(query, texts)
         except Exception as exc:
-            # Recover from provider failures without printing request data.
+            # Recover from provider or storage failures without printing private data.
             print(
-                f"Embeddings unavailable ({type(exc).__name__}); using keyword-only "
+                f"Semantic retrieval unavailable ({type(exc).__name__}); using keyword-only "
                 "retrieval for this question. Check EMBEDDING_BASE_URL, "
-                "EMBEDDING_MODEL and EMBEDDING_API_KEY.",
+                "EMBEDDING_MODEL, EMBEDDING_API_KEY and VECTOR_DB_PATH.",
                 file=sys.stderr,
             )
             return keyword[:limit], "keyword"
-        query_vector, *history_vectors = normalized
-        similarities = [
-            sum(a * b for a, b in zip(query_vector, vector)) for vector in history_vectors
-        ]
-        semantic = sorted(
-            range(len(texts)), key=lambda i: similarities[i], reverse=True
-        )
         fused = Counter()
         # Each search contributes equally by rank, without mixing their raw scores.
         # The offset of 60 limits how much a single top-ranked result dominates.
@@ -109,9 +95,30 @@ class Retriever:
                 fused[index] += 1 / (60 + position)
         return sorted(fused, key=lambda i: (-fused[i], i))[:limit], "hybrid"
 
+    def _semantic_rank(self, query: str, texts: list[str]) -> list[int]:
+        if self.vector_index is not None:
+            return self.vector_index.rank(query, texts, self.embed)
+        # Injected retrievers can still use transient vectors, useful for offline tests.
+        vectors = self.embed([query, *texts])
+        if len(vectors) != len(texts) + 1:
+            raise ValueError("Embedding count does not match inputs")
+        normalized = []
+        for vector in vectors:
+            norm = math.hypot(*vector)
+            if not norm or not math.isfinite(norm):
+                raise ValueError("Embedding must be finite and nonzero")
+            if len(vector) != len(vectors[0]):
+                raise ValueError("Embedding dimensions do not match")
+            normalized.append([value / norm for value in vector])
+        query_vector, *history_vectors = normalized
+        similarities = [
+            sum(a * b for a, b in zip(query_vector, vector)) for vector in history_vectors
+        ]
+        return sorted(range(len(texts)), key=lambda i: similarities[i], reverse=True)
 
-def configured_retriever() -> Retriever:
-    """Create a retriever using the current environment settings."""
+
+def configured_retriever(*, dataset: str = "", history_path: Path | None = None) -> Retriever:
+    """Create a retriever with persistent, database-scoped historical embeddings."""
     mode = os.getenv("RETRIEVAL_MODE", "hybrid").strip().lower()
     if mode not in {"hybrid", "keyword"}:
         raise ValueError("RETRIEVAL_MODE must be 'hybrid' or 'keyword'")
@@ -138,4 +145,17 @@ def configured_retriever() -> Retriever:
             raise ValueError("Embedding response indices do not match inputs")
         return [item.embedding for item in ordered]
 
-    return Retriever(embed)
+    project_root = Path(__file__).resolve().parents[1]
+    vector_path = Path(os.getenv("VECTOR_DB_PATH") or project_root / "data" / "vectors").expanduser()
+    if not vector_path.is_absolute():
+        vector_path = project_root / vector_path
+    namespace = json.dumps(
+        {
+            "dataset": dataset,
+            "history": str((history_path or project_root / "data" / "history.db").resolve()),
+            "model": model,
+            "endpoint": base_url.rstrip("/"),
+        },
+        sort_keys=True,
+    )
+    return Retriever(embed, QdrantHistoryIndex(vector_path, namespace))

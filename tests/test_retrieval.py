@@ -1,16 +1,25 @@
-"""Offline tests for hybrid ranking, fresh embeddings, fallback, and history scope."""
+"""Offline tests for hybrid ranking, persistent vectors, fallback, and history scope."""
 
 import json
 import sqlite3
+from contextlib import closing
+from pathlib import Path
 
 import httpx
 import pytest
 from openai import OpenAI
+from qdrant_client import QdrantClient
 
 from app.agent import SQLAgent
 from app.db import Database, History
 from app.retrieval import Retriever, configured_retriever, keyword_rank
+from app.vector_store import QdrantHistoryIndex
 from benchmarks.run import load_database
+
+
+@pytest.fixture(autouse=True)
+def isolated_vector_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("VECTOR_DB_PATH", str(tmp_path / "vectors"))
 
 
 def test_keyword_stemming_does_not_merge_empty_terms_or_strip_double_s():
@@ -114,7 +123,7 @@ def test_semantic_search_finds_synonyms_and_uses_cosine_similarity():
     assert retriever.rank("buyers", ["customers", "products"], 1) == ([0], "hybrid")
 
 
-def test_every_search_embeds_the_query_and_all_history_questions():
+def test_transient_retriever_embeds_the_query_and_all_history_questions():
     batches = []
 
     def embed(texts):
@@ -139,7 +148,7 @@ def test_every_search_embeds_the_query_and_all_history_questions():
     ]
 
 
-def test_every_search_uses_its_own_vectors_and_dimensions():
+def test_transient_retriever_uses_its_own_vectors_and_dimensions():
     responses = iter(
         [
             [[1, 0], [1, 0], [0, 1]],
@@ -210,7 +219,7 @@ def test_invalid_embedding_response_uses_keyword_fallback(vectors, capsys):
 
 
 @pytest.mark.parametrize("separate_provider", [False, True])
-def test_embedding_provider_configuration_and_independent_retrievers(
+def test_embedding_provider_configuration_and_persistent_retrievers(
     monkeypatch, separate_provider
 ):
     import app.retrieval as retrieval_module
@@ -229,14 +238,14 @@ def test_embedding_provider_configuration_and_independent_retrievers(
     def respond(request):
         requests.append(request)
         inputs = json.loads(request.content)["input"]
-        vectors = [[1, 0], [0, 1], [-1, 0], [1, 1]]
+        vectors = {"buyers": [1, 0], "inventory": [0, 1], "shipping": [-1, 0], "customers": [1, 1]}
         return httpx.Response(
             200,
             json={
                 "object": "list",
                 "model": "configured-model",
                 "data": [
-                    {"object": "embedding", "index": i, "embedding": vectors[i]}
+                    {"object": "embedding", "index": i, "embedding": vectors[inputs[i]]}
                     for i in reversed(range(len(inputs)))
                 ],
                 "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
@@ -257,11 +266,9 @@ def test_embedding_provider_configuration_and_independent_retrievers(
     second = configured_retriever()
     assert second is not first
     assert second.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
-    assert len(requests) == 3
-    assert all(
-        json.loads(request.content)["input"] == ["buyers", *documents]
-        for request in requests
-    )
+    assert [json.loads(request.content)["input"] for request in requests] == [
+        ["buyers"], documents, ["buyers"], ["buyers"]
+    ]
     request = requests[0]
     assert request.url.host == ("vectors.test" if separate_provider else "chat.test")
     assert request.url.path == "/v1/embeddings"
@@ -277,6 +284,78 @@ def test_embedding_provider_configuration_and_independent_retrievers(
     assert third is not first
     assert third.rank("buyers", documents, 3) == ([2, 0, 1], "hybrid")
     assert json.loads(requests[-1].content)["model"] == "another-model"
+    assert [json.loads(request.content)["input"] for request in requests[-2:]] == [
+        ["buyers"], documents
+    ]
+
+
+@pytest.mark.parametrize("changed", ["dataset", "history", "model", "endpoint"])
+def test_configured_collections_isolate_database_and_embedding_settings(
+    tmp_path, monkeypatch, changed
+):
+    monkeypatch.setenv("RETRIEVAL_MODE", "hybrid")
+    monkeypatch.setenv("EMBEDDING_MODEL", "model-a")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "https://embedding.test/v1")
+    settings = {"dataset": "database-a", "history_path": tmp_path / "history-a.db"}
+    calls = []
+
+    def embed(texts):
+        calls.append(list(texts))
+        return [[1, 0] for _ in texts]
+
+    def search():
+        retriever = configured_retriever(**settings)
+        retriever.embed = embed
+        assert retriever.rank("buyers", ["customers"], 1) == ([0], "hybrid")
+
+    search()
+    search()
+    assert calls == [["buyers"], ["customers"], ["buyers"]]
+    if changed == "dataset":
+        settings["dataset"] = "database-b"
+    elif changed == "history":
+        settings["history_path"] = tmp_path / "history-b.db"
+    elif changed == "model":
+        monkeypatch.setenv("EMBEDDING_MODEL", "model-b")
+    else:
+        monkeypatch.setenv("EMBEDDING_BASE_URL", "https://other.test/v1")
+    search()
+    assert calls[-2:] == [["buyers"], ["customers"]]
+    assert len(calls) == 5
+
+
+def test_relative_vector_path_uses_project_root_and_empty_searches_skip_storage(
+    tmp_path, monkeypatch
+):
+    import app.retrieval as retrieval_module
+    import app.vector_store as vector_module
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RETRIEVAL_MODE", "hybrid")
+    monkeypatch.setenv("VECTOR_DB_PATH", "data/custom-vectors")
+    monkeypatch.setattr(vector_module, "QdrantClient", lambda **_: pytest.fail("No storage needed"))
+    retriever = configured_retriever()
+    retriever.embed = lambda *_: pytest.fail("No embeddings needed")
+    assert retriever.vector_index.path == (
+        Path(retrieval_module.__file__).resolve().parents[1] / "data/custom-vectors"
+    )
+    assert retriever.rank("customers", [], 3) == ([], "none")
+    assert retriever.rank("customers", ["customers"], 0) == ([], "none")
+
+
+def test_vector_storage_failure_falls_back_to_bm25_and_can_recover(tmp_path, capsys):
+    path = tmp_path / "vectors"
+    retriever = Retriever(
+        lambda texts: [[1, 0] for _ in texts], QdrantHistoryIndex(path, "lock-test")
+    )
+    documents = ["customers with orders", "customers"]
+    with closing(QdrantClient(path=str(path))):
+        assert retriever.rank("customers", documents, 2) == ([1, 0], "keyword")
+    diagnostic = capsys.readouterr().err
+    assert "keyword-only" in diagnostic and "VECTOR_DB_PATH" in diagnostic
+    assert str(path) not in diagnostic
+    assert retriever.rank("customers", documents, 2)[1] == "hybrid"
+    assert capsys.readouterr().err == ""
 
 
 def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
@@ -287,6 +366,10 @@ def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
         retrieval_module,
         "OpenAI",
         lambda **kwargs: pytest.fail("Unexpected provider call"),
+    )
+    monkeypatch.setattr(
+        retrieval_module, "QdrantHistoryIndex",
+        lambda *_: pytest.fail("Unexpected vector storage"),
     )
     retriever = configured_retriever()
     assert retriever.rank(
@@ -327,7 +410,8 @@ def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path
     previous_question = "List customer names"
     history.save("past", previous_question, "test", "SELECT name FROM customers")
     agent = SQLAgent(
-        database, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, retriever=Retriever(embed),
+        database, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete,
+        retriever=Retriever(embed, QdrantHistoryIndex(tmp_path / "vectors", "schema-test")),
         critique_complete=lambda *_: {"approved": True, "issues": []},
     )
     question = "Who purchased recently?"
@@ -339,16 +423,16 @@ def test_full_schema_sent_each_time_and_only_history_questions_embedded(tmp_path
     assert len(schema) == 7
     assert any("CREATE VIEW customer_names" in ddl for ddl in contexts[-1]["schema"])
     assert any("REFERENCES customers(id)" in ddl for ddl in contexts[-1]["schema"])
-    assert batches == [[question, previous_question]]
+    assert batches == [[question], [previous_question]]
 
-    # Repeated questions still load the current schema and request fresh embeddings.
+    # Repeated questions still load the current schema, but reuse historical vectors.
     with sqlite3.connect(path) as connection:
         connection.execute("ALTER TABLE unrelated_c ADD COLUMN note TEXT")
     agent.propose(question, "session", "test-model")
     assert contexts[-1]["schema"] == [table["sql"] for table in database.schema()]
     assert any("note TEXT" in ddl for ddl in contexts[-1]["schema"])
     assert not any("note TEXT" in ddl for ddl in contexts[0]["schema"])
-    assert batches == [[question, previous_question], [question, previous_question]]
+    assert batches == [[question], [previous_question], [question]]
 
 
 def test_empty_history_sends_full_schema_without_retrieval(tmp_path, monkeypatch):
@@ -406,7 +490,7 @@ def test_history_scope_limits_question_only_embeddings_and_updated_candidates(
         contexts.append(json.loads(messages[1]["content"]))
         return {"sql": "SELECT 1", "explanation": "One."}
 
-    retriever = Retriever(embed)
+    retriever = Retriever(embed, QdrantHistoryIndex(tmp_path / "vectors", "scope-test"))
     agent = SQLAgent(
         source, history, classify_complete=lambda *_: {"valid": True, "explanation": "Answerable."}, complete=complete, retriever=retriever,
         critique_complete=lambda *_: {"approved": True, "issues": []},
@@ -435,15 +519,13 @@ def test_history_scope_limits_question_only_embeddings_and_updated_candidates(
     history.save(
         "archive", "Fresh receipt question", "test", "SELECT 42 AS SQL_TEXT_MARKER"
     )
-    # A new history entry changes the candidate pool; all current candidates are sent.
+    # A new history entry only requires embedding that entry and the search query.
     agent.propose("Customer spending", "session", "test-model")
-    assert len(batches) == 2
-    assert batches[-1] == [
-        "Customer spending Session question 6 Session question 7",
-        *(item["question"] for item in history.successful()),
+    assert len(batches) == 4
+    assert batches[-2:] == [
+        ["Customer spending Session question 6 Session question 7"],
+        ["Fresh receipt question"],
     ]
-    assert len(batches[-1]) == 201
-    assert "Fresh receipt question" in batches[-1]
 
 
 def test_chat_only_provider_reports_keyword_mode_without_changing_endpoint(

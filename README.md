@@ -26,24 +26,27 @@ The app checks that the source is an existing, readable SQLite database before s
 
 ## Hybrid retrieval
 
-Hybrid retrieval searches previous successful questions. **BM25** supplies the keyword ranking, using word rarity, diminishing returns for repeated words, and question-length normalization (`k1 = 1.2`, `b = 0.75`). BM25 and semantic rankings have equal weight: each contributes `1 / (60 + rank)` through reciprocal rank fusion. Raw BM25 and cosine-similarity scores are never compared directly.
+Hybrid retrieval searches previous successful questions using **BM25** and a persistent local **Qdrant vector database**. BM25 supplies the keyword ranking, using word rarity, diminishing returns for repeated words, and question-length normalization (`k1 = 1.2`, `b = 0.75`). Qdrant supplies the semantic ranking using cosine similarity. Both rankings have equal weight: each contributes `1 / (60 + rank)` through reciprocal rank fusion. Raw BM25 and cosine-similarity scores are never compared directly.
 
 See the [keyword ranking comparison](docs/keyword-ranking-comparison.md) for the BM25 formula and its differences from the previous overlap scorer and TF-IDF.
 
-Configure embeddings in your environment or `.env`:
+Configure retrieval in your environment or `.env`:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use BM25 without embedding requests |
+| `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use BM25 without embedding requests or vector-database access |
+| `VECTOR_DB_PATH` | `<project>/data/vectors` | Persistent local Qdrant directory; relative overrides resolve under the project root |
 | `EMBEDDING_MODEL` | `text-embedding-3-large` | Model used for semantic history retrieval |
 | `EMBEDDING_BASE_URL` | `OPENAI_BASE_URL`, otherwise `https://api.openai.com/v1` | OpenAI-compatible embedding endpoint |
 | `EMBEDDING_API_KEY` | `OPENAI_API_KEY` | Credential for that endpoint |
 
-A chat-compatible provider may not support embeddings. Set `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` to a separate provider when needed. The endpoint must support the [embeddings API](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create). An embedding failure prints a clear message and uses keyword-only retrieval for that question. Later searches attempt embeddings again. Each proposal reports the history retrieval mode actually used. With no successful history, it reports `none` and makes no embedding requests.
+A chat-compatible provider may not support embeddings. Set `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` to a separate provider when needed. The endpoint must support the [embeddings API](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create). An embedding or vector-storage failure prints a clear message and uses BM25 alone for that question. Later searches retry hybrid retrieval. Each proposal reports the mode actually used. With no successful history, it reports `none`, makes no embedding requests, and does not open Qdrant.
 
 Every question receives the full current schema: all table and view DDL, including declared foreign keys. Historical retrieval searches the question text of the latest **200 successful queries from the same database**, selecting up to **three examples** before including their SQL in the model prompt.
 
-Each hybrid history search requests fresh embeddings for its search text and all candidate questions, even when the text is unchanged. Vectors are discarded after ranking, and each agent gets its own retriever. No vector database is needed.
+Each hybrid search embeds its search text, then embeds only candidate questions missing from Qdrant. The first search backfills eligible history; later searches reuse saved vectors across app restarts. Identical question texts share one vector while their history rows remain distinct. Collections are isolated by source database, history database, embedding endpoint, model, and vector dimension. Search is restricted to the current candidates, so old stored vectors cannot introduce unrelated examples.
+
+Qdrant runs inside the Python app: no server, Docker, or additional API key is required. The default vector directory is ignored by Git. OpenAI embedding requests remain billable. SQLite remains the source of saved question/SQL pairs. See [vector storage, recovery, and limits](docs/vector-storage.md).
 
 ## Column inspection tools
 
@@ -123,8 +126,8 @@ python -m pytest -q -p no:cacheprovider
 
 ## Privacy
 
-In hybrid mode, after classification accepts the request and when successful history exists, the **embedding provider** receives question text only: the current question with the last two successful question texts for follow-up context, plus up to 200 candidate historical questions from the same database. These texts are sent on every search, including repeated questions. Schema and historical SQL are not embedded. Keyword mode and rejected requests make no embedding requests.
+In hybrid mode, after classification accepts the request and when successful history exists, the **embedding provider** receives the current question with the last two successful question texts for follow-up context on every search. It also receives candidate historical question texts whose embeddings are missing from the current Qdrant collection, drawn from up to 200 successful queries for the same database. Cached candidate questions are not embedded individually again, though recent questions can still appear in the search context. Schema and historical SQL are not embedded. Keyword mode and rejected requests make no embedding requests or vector-database accesses.
 
 The **chat provider** receives the current question, the full current schema, and up to six successful conversation turns with their SQL for classification. Accepted requests send that context again for generation, with up to three retrieved question/SQL examples. The same task context is sent again for critique, together with the proposed SQL, explanation, validation status, and any correction feedback used for generation. These providers may be different when separate embedding settings are used.
 
-Final query result rows stay local. When column inspection is enabled, bounded stored column values and aggregate statistics are sent to the chat provider during generation or critique, before final-query approval. Set `SQL_MAX_TOOL_CALLS=0` to disable this access. `.env` and source databases are excluded from Git. Conversation history in `data/history.db` can be committed to Git, including saved questions, SQL, and source database paths. Embedding vectors exist only while the current search is being ranked.
+Final query result rows stay local. When column inspection is enabled, bounded stored column values and aggregate statistics are sent to the chat provider during generation or critique, before final-query approval. Set `SQL_MAX_TOOL_CALLS=0` to disable this access. `.env` and source databases are excluded from Git. Conversation history in `data/history.db` can be committed to Git, including saved questions, SQL, and source database paths. Historical embeddings and deterministic question identifiers persist locally in Qdrant; question text and SQL remain in SQLite. Query embeddings are temporary. Removed history rows cannot be selected. A stored vector remains eligible only while its question text occurs among the current candidates; removing rows does not erase stored vectors. See the [rebuild procedure](docs/vector-storage.md#rebuild-the-vector-database).

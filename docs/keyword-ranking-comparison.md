@@ -48,6 +48,6 @@ Only positive-score candidates enter the keyword ranking, with input order break
 
 ## Hybrid retrieval
 
-BM25 and semantic search each produce a ranking. Reciprocal rank fusion adds `1 / (60 + rank)` from each ranking, with equal weight and one-based ranks, then selects up to three examples. A candidate with no BM25 match can still enter through semantic search. Explicit keyword mode and embedding failures use BM25 alone.
+BM25 and Qdrant cosine search each rank the current historical candidates. Qdrant persists question embeddings and reuses them across searches; only the query and missing historical question texts need embedding. Reciprocal rank fusion adds `1 / (60 + rank)` from each ranking, with equal weight and one-based ranks, then selects up to three examples. A candidate with no BM25 match can still enter through semantic search. Explicit keyword mode, embedding failures, and vector-storage failures use BM25 alone. See [vector storage](vector-storage.md) for isolation and persistence details.
 
 All three lexical approaches in the table rely on shared tokens and ignore word order. Semantic search helps match differently worded questions. This change has offline regression coverage; the published SQL benchmark starts each case with empty history and therefore does not measure retrieval quality.

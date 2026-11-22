@@ -90,7 +90,9 @@ class SQLAgent:
         )
         if type(self.max_tool_calls) is not int or not 0 <= self.max_tool_calls <= 20:
             raise ValueError("Tool budget must be an integer from 0 to 20.")
-        self.retriever = retriever if retriever is not None else configured_retriever()
+        self.retriever = retriever if retriever is not None else configured_retriever(
+            dataset=self.history.dataset, history_path=self.history.path
+        )
         self.max_repairs = (
             int(os.getenv("SQL_MAX_REPAIRS", "5"))
             if max_repairs is None
