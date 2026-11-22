@@ -19,6 +19,50 @@ def test_keyword_stemming_does_not_merge_empty_terms_or_strip_double_s():
     assert keyword_rank("customers", ["customer"]) == [0]
 
 
+@pytest.mark.parametrize(
+    "query, documents, expected",
+    [
+        ("customers", [], []),
+        ("", ["customers"], []),
+        ("a ! 1", ["customers"], []),
+        ("customers", ["", "!!!", "a 1"], []),
+        ("customers", ["", "customers", "a 1"], [1]),
+        ("customers", ["orders", "products"], []),
+        ("customers", ["customers"], [0]),
+        ("customers", ["customers", "customers"], [0, 1]),
+    ],
+)
+def test_bm25_handles_empty_inputs_and_keeps_common_matches(query, documents, expected):
+    assert keyword_rank(query, documents) == expected
+
+
+def test_bm25_rewards_document_repetition_at_equal_length():
+    documents = ["revenue cost forecast", "revenue revenue forecast"]
+    assert keyword_rank("revenue", documents) == [1, 0]
+
+
+def test_bm25_saturation_rewards_coverage_over_repeating_one_term():
+    # Equal lengths and equal document frequencies isolate term saturation.
+    documents = ["revenue " * 12, "revenue " * 6 + "cost " * 6, "cost " * 12]
+    assert keyword_rank("revenue cost", documents) == [1, 0, 2]
+
+
+def test_bm25_prefers_shorter_questions_with_the_same_matches():
+    documents = ["customers " + "orders " * 8, "customers", "orders"]
+    assert keyword_rank("customers", documents) == [1, 0]
+
+
+def test_bm25_weights_terms_by_document_frequency():
+    documents = ["customers", "revenue", "customers"]
+    assert keyword_rank("customers revenue", documents) == [1, 0, 2]
+
+
+def test_bm25_scores_each_query_term_once():
+    documents = ["revenue cost", "revenue revenue revenue revenue"]
+    assert keyword_rank("revenue cost", documents) == [0, 1]
+    assert keyword_rank("revenue " * 20 + "cost", documents) == [0, 1]
+
+
 def test_zero_retrieval_limit_skips_provider_and_returns_no_examples():
     retriever = Retriever(lambda *_: pytest.fail("No examples requested"))
     assert retriever.rank("customers", ["customers"], 0) == ([], "none")
@@ -36,7 +80,7 @@ def test_invalid_retrieval_mode_is_not_silently_treated_as_keyword(monkeypatch):
 
 def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
     query = "revenue"
-    documents = ["revenue revenue", "revenue cost", "turnover", "expenses"]
+    documents = ["revenue cost", "revenue revenue", "turnover", "expenses"]
     # Small, fixed vectors control semantic rankings without an embedding API.
     vectors = {
         query: [1, 0],
@@ -46,10 +90,10 @@ def test_rank_fusion_uses_both_rankings_instead_of_raw_scores():
         documents[3]: [-1, 0],
     }
     retriever = Retriever(lambda texts: [vectors[text] for text in texts])
-    assert keyword_rank(query, documents) == [0, 1]
-    # Keyword order is 0, 1; semantic order is 2, 1, 0, 3.
-    # RRF puts 0 just ahead of 1 and includes the semantic-only synonym 2.
-    assert retriever.rank(query, documents, 3) == ([0, 1, 2], "hybrid")
+    assert keyword_rank(query, documents) == [1, 0]
+    # BM25 order is 1, 0; semantic order is 2, 1, 0, 3.
+    # RRF puts 1 ahead of 0 and includes the semantic-only synonym 2.
+    assert retriever.rank(query, documents, 3) == ([1, 0, 2], "hybrid")
 
 
 def test_equal_rank_weights_balance_opposite_rankings():
@@ -116,12 +160,16 @@ def test_embedding_failure_falls_back_clearly_for_each_question(capsys):
         raise RuntimeError("Provider detail that should not be printed")
 
     retriever = Retriever(unavailable)
-    documents = ["customers in the North", "shipping rates", "customers in the South"]
-    assert retriever.rank("customers", documents, 3) == ([0, 2], "keyword")
+    documents = [
+        "customers in the North with recent orders",
+        "shipping rates",
+        "customers in the South",
+    ]
+    assert retriever.rank("customers", documents, 3) == ([2, 0], "keyword")
     message = capsys.readouterr().err.lower()
     assert "keyword" in message and "runtimeerror" in message
     assert "provider detail" not in message
-    assert retriever.rank("customers", documents, 3) == ([0, 2], "keyword")
+    assert retriever.rank("customers", documents, 3) == ([2, 0], "keyword")
     assert "keyword-only" in capsys.readouterr().err
     assert calls == [["customers", *documents], ["customers", *documents]]
 
@@ -241,7 +289,9 @@ def test_explicit_keyword_mode_never_constructs_embedding_client(monkeypatch):
         lambda **kwargs: pytest.fail("Unexpected provider call"),
     )
     retriever = configured_retriever()
-    assert retriever.rank("customers", ["customers", "orders"], 2) == ([0], "keyword")
+    assert retriever.rank(
+        "customers", ["customers with orders", "customers"], 2
+    ) == ([1, 0], "keyword")
 
 
 def test_empty_candidates_do_not_request_embeddings():

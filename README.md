@@ -1,6 +1,6 @@
 # Natural language to SQL
 
-A small Python terminal app built with **LangGraph**. Ask a question, review or edit the generated SQL, and approve it to print results. It sends the full schema with every question, retrieves successful past queries using keyword and semantic search, remembers conversation context, repairs SQL validation errors, and critiques whether the SQL answers the question.
+A small Python terminal app built with **LangGraph**. Ask a question, review or edit the generated SQL, and approve it to print results. It sends the full schema with every question, retrieves successful past queries using BM25 keyword search and semantic search, remembers conversation context, repairs SQL validation errors, and critiques whether the SQL answers the question.
 
 ## Run
 
@@ -26,15 +26,15 @@ The app checks that the source is an existing, readable SQLite database before s
 
 ## Hybrid retrieval
 
-Hybrid retrieval searches previous successful questions. Keyword and semantic rankings have equal weight: each contributes `1 / (60 + rank)` through reciprocal rank fusion. Raw keyword and cosine-similarity scores are never compared directly.
+Hybrid retrieval searches previous successful questions. **BM25** supplies the keyword ranking, using word rarity, diminishing returns for repeated words, and question-length normalization (`k1 = 1.2`, `b = 0.75`). BM25 and semantic rankings have equal weight: each contributes `1 / (60 + rank)` through reciprocal rank fusion. Raw BM25 and cosine-similarity scores are never compared directly.
 
-See the [keyword ranking comparison](docs/keyword-ranking-comparison.md) for how the current scorer differs from TF-IDF and BM25.
+See the [keyword ranking comparison](docs/keyword-ranking-comparison.md) for the BM25 formula and its differences from the previous overlap scorer and TF-IDF.
 
 Configure embeddings in your environment or `.env`:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use keyword retrieval without embedding requests |
+| `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use BM25 without embedding requests |
 | `EMBEDDING_MODEL` | `text-embedding-3-large` | Model used for semantic history retrieval |
 | `EMBEDDING_BASE_URL` | `OPENAI_BASE_URL`, otherwise `https://api.openai.com/v1` | OpenAI-compatible embedding endpoint |
 | `EMBEDDING_API_KEY` | `OPENAI_API_KEY` | Credential for that endpoint |

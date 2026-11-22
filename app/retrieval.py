@@ -1,4 +1,4 @@
-"""Equal-weight keyword and semantic retrieval for successful past questions."""
+"""Equal-weight BM25 and semantic retrieval for successful past questions."""
 
 import math
 import os
@@ -7,6 +7,10 @@ import sys
 from collections import Counter
 
 from openai import OpenAI
+
+
+BM25_K1 = 1.2
+BM25_B = 0.75
 
 
 def tokens(text: str) -> Counter:
@@ -21,26 +25,39 @@ def tokens(text: str) -> Counter:
 
 
 def keyword_rank(query: str, texts: list[str]) -> list[int]:
-    """Return matching text indexes, ranked by IDF-weighted word overlap."""
-    terms = [tokens(text) for text in texts]
+    """Rank matching text indexes with BM25; exact ties retain input order."""
     query_terms = tokens(query)
+    if not texts or not query_terms:
+        return []
+    terms = [tokens(text) for text in texts]
+    lengths = [sum(doc.values()) for doc in terms]
+    average_length = sum(lengths) / len(texts)
+    if not average_length:
+        return []
     # Count questions containing each word, rather than its total occurrences.
     frequency = Counter(word for doc in terms for word in doc)
-    # Shared occurrences earn more weight when the word appears in fewer questions.
-    scores = [
-        sum(
-            min(count, doc[word])
-            * (1 + math.log((len(texts) + 1) / (frequency[word] + 1)))
-            for word, count in query_terms.items()
+    # Score each distinct query term once. Positive IDF keeps common terms useful.
+    idf = {
+        word: math.log1p((len(texts) - frequency[word] + 0.5) / (frequency[word] + 0.5))
+        for word in query_terms
+        if frequency[word]
+    }
+    scores = []
+    for doc, length in zip(terms, lengths):
+        normalizer = BM25_K1 * (1 - BM25_B + BM25_B * length / average_length)
+        scores.append(
+            sum(
+                weight * doc[word] * (BM25_K1 + 1) / (doc[word] + normalizer)
+                for word, weight in idf.items()
+                if doc[word]
+            )
         )
-        for doc in terms
-    ]
     ranked = sorted(range(len(texts)), key=lambda i: scores[i], reverse=True)
     return [i for i in ranked if scores[i] > 0]
 
 
 class Retriever:
-    """Combine keyword search with fresh embeddings for each history search."""
+    """Combine BM25 with fresh embeddings for each history search."""
 
     def __init__(self, embed=None):
         self.embed = embed
