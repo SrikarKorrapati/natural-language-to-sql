@@ -221,7 +221,7 @@ def test_embedding_provider_configuration_and_independent_retrievers(
     assert request.headers["authorization"] == f"Bearer {key}"
     body = json.loads(request.content)
     assert body["model"] == (
-        "custom-vector-model" if separate_provider else "text-embedding-3-small"
+        "custom-vector-model" if separate_provider else "text-embedding-3-large"
     )
     assert body["encoding_format"] == "float"
     monkeypatch.setenv("EMBEDDING_MODEL", "another-model")

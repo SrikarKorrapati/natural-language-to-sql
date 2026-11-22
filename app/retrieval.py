@@ -102,7 +102,7 @@ def configured_retriever() -> Retriever:
         return Retriever()
 
     # Separate embedding settings override chat settings for chat-only providers.
-    model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
     base_url = os.getenv("EMBEDDING_BASE_URL") or os.getenv(
         "OPENAI_BASE_URL", "https://api.openai.com/v1"
     )

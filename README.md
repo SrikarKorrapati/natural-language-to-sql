@@ -35,7 +35,7 @@ Configure embeddings in your environment or `.env`:
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `RETRIEVAL_MODE` | `hybrid` | Set to `keyword` to use keyword retrieval without embedding requests |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Model served by the embedding provider |
+| `EMBEDDING_MODEL` | `text-embedding-3-large` | Model used for semantic history retrieval |
 | `EMBEDDING_BASE_URL` | `OPENAI_BASE_URL`, otherwise `https://api.openai.com/v1` | OpenAI-compatible embedding endpoint |
 | `EMBEDDING_API_KEY` | `OPENAI_API_KEY` | Credential for that endpoint |
 
